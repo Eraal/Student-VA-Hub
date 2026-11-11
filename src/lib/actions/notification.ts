@@ -45,3 +45,4 @@ export async function markAllNotificationsReadAction() {
     return { success: false, error: message };
   }
 }
+

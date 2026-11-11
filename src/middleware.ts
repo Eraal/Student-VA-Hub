@@ -7,22 +7,21 @@ export default auth((req) => {
   const isLoggedIn = !!user;
   const role = user?.role;
 
-  // 1. Root path redirect
+  // 1. Root path: if logged in, redirect to respective role dashboard; otherwise show public landing page
   if (pathname === "/") {
-    if (!isLoggedIn) {
-      return NextResponse.redirect(new URL("/login", req.url));
+    if (isLoggedIn) {
+      if (role === "STUDENT") {
+        return NextResponse.redirect(new URL("/student", req.url));
+      }
+      if (role === "CLIENT") {
+        return NextResponse.redirect(new URL("/client", req.url));
+      }
     }
-    if (role === "STUDENT") {
-      return NextResponse.redirect(new URL("/student", req.url));
-    }
-    if (role === "CLIENT") {
-      return NextResponse.redirect(new URL("/client", req.url));
-    }
-    return NextResponse.redirect(new URL("/login", req.url));
+    return NextResponse.next();
   }
 
   // 2. Auth pages: redirect already logged-in users to their role page
-  if (pathname === "/login" || pathname === "/register") {
+  if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") {
     if (isLoggedIn) {
       if (role === "STUDENT") {
         return NextResponse.redirect(new URL("/student", req.url));
