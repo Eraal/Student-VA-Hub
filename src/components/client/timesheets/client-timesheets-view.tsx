@@ -475,3 +475,4 @@ export function ClientTimesheetsView({ initialData }: ClientTimesheetsViewProps)
     </div>
   );
 }
+

@@ -1,25 +1,37 @@
 import * as React from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Calendar } from "lucide-react";
+import { requireRolePage } from "@/lib/auth-helpers";
+import { Role } from "@prisma/client";
+import { getClientCalendarData } from "@/lib/services/calendar-service";
+import { ClientCalendarView } from "@/components/client/calendar/client-calendar-view";
 
-export default function ClientCalendarPage() {
+interface ClientCalendarPageProps {
+  searchParams: Promise<{ date?: string }>;
+}
+
+async function CalendarContent({ searchParams }: ClientCalendarPageProps) {
+  const user = await requireRolePage(Role.CLIENT);
+  const resolvedParams = await searchParams;
+  const initialData = await getClientCalendarData(user.id, resolvedParams.date);
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--color-text)]">
-          Student Calendar
-        </h1>
-        <p className="text-xs text-[var(--color-muted)]">
-          Read-only view ng availability at class schedule ng student.
-        </p>
-      </div>
-
-      <EmptyState
-        icon={Calendar}
-        title="Walang schedule na maipakita"
-        description="I-link muna ang iyong student VA gamit ang kanilang invite code para makita ang kanilang class schedule at available work hours."
-      />
-    </div>
+    <ClientCalendarView
+      initialData={initialData}
+      initialAnchorDate={resolvedParams.date}
+    />
   );
 }
 
+export default function ClientCalendarPage(props: ClientCalendarPageProps) {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="space-y-4 animate-pulse">
+          <div className="h-6 w-48 rounded bg-[var(--color-border)]" />
+          <div className="h-64 rounded-md bg-[var(--color-surface)]" />
+        </div>
+      }
+    >
+      <CalendarContent {...props} />
+    </React.Suspense>
+  );
+}

@@ -41,3 +41,4 @@ export const markInvoicePaidSchema = z.object({
 });
 
 export type MarkInvoicePaidInput = z.infer<typeof markInvoicePaidSchema>;
+

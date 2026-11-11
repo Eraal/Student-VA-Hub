@@ -258,3 +258,4 @@ export function StudentEarningsView({ initialData }: StudentEarningsViewProps) {
     </div>
   );
 }
+

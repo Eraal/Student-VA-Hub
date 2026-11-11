@@ -27,10 +27,11 @@ describe("time-service", () => {
     studentId = student.id;
     clientId = client.id;
 
-    // Clean up any open logs for juan that might be left over from this suite
-    await prisma.timeLog.deleteMany({
-      where: { taskId: testTaskId },
-    });
+    if (testTaskId) {
+      await prisma.timeLog.deleteMany({
+        where: { taskId: testTaskId },
+      });
+    }
 
     // Create a temporary task to track time against
     const task = await prisma.task.create({

@@ -21,6 +21,9 @@ interface AssignTaskDialogProps {
   onClose: () => void;
   onSuccess: () => void;
   linkedStudentName?: string;
+  initialDate?: string;
+  initialStartTime?: string;
+  initialEndTime?: string;
 }
 
 export function AssignTaskDialog({
@@ -28,16 +31,17 @@ export function AssignTaskDialog({
   onClose,
   onSuccess,
   linkedStudentName,
+  initialDate,
+  initialStartTime,
+  initialEndTime,
 }: AssignTaskDialogProps) {
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [dateStr, setDateStr] = React.useState(() => {
-    // Default to today or tomorrow
-    const d = new Date();
-    return d.toISOString().split("T")[0];
+    return initialDate || new Date().toISOString().split("T")[0];
   });
-  const [startTimeStr, setStartTimeStr] = React.useState("18:00");
-  const [endTimeStr, setEndTimeStr] = React.useState("20:00");
+  const [startTimeStr, setStartTimeStr] = React.useState(initialStartTime || "18:00");
+  const [endTimeStr, setEndTimeStr] = React.useState(initialEndTime || "20:00");
   const [estHours, setEstHours] = React.useState<number>(2.0);
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -51,16 +55,31 @@ export function AssignTaskDialog({
     if (isOpen) {
       setTitle("");
       setDescription("");
-      const today = new Date().toISOString().split("T")[0];
-      setDateStr(today);
-      setStartTimeStr("18:00");
-      setEndTimeStr("20:00");
-      setEstHours(2.0);
+      const date = initialDate || new Date().toISOString().split("T")[0];
+      const start = initialStartTime || "18:00";
+      const end = initialEndTime || "20:00";
+      setDateStr(date);
+      setStartTimeStr(start);
+      setEndTimeStr(end);
+
+      try {
+        const [sh, sm] = start.split(":").map(Number);
+        const [eh, em] = end.split(":").map(Number);
+        const diffMins = eh * 60 + em - (sh * 60 + sm);
+        if (diffMins > 0) {
+          setEstHours(Math.round((diffMins / 60) * 10) / 10);
+        } else {
+          setEstHours(2.0);
+        }
+      } catch {
+        setEstHours(2.0);
+      }
+
       setServerError(null);
       setFieldErrors({});
       setConflictResult(null);
     }
-  }, [isOpen]);
+  }, [isOpen, initialDate, initialStartTime, initialEndTime]);
 
   // Compute ISO timestamps from date and times
   const computeIsoTimestamps = React.useCallback(() => {
