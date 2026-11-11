@@ -134,3 +134,4 @@ export function MaxHoursCard({ initialMaxHours, onUpdated }: MaxHoursCardProps) 
     </Card>
   );
 }
+

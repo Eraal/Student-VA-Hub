@@ -114,3 +114,4 @@ export function intervalsOverlap(
 ): boolean {
   return start1 < end2 && end1 > start2;
 }
+
