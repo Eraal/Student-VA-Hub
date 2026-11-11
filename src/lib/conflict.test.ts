@@ -366,3 +366,4 @@ describe("conflict-detector (SPEC §6 & Acceptance Tests §10)", () => {
     });
   });
 });
+

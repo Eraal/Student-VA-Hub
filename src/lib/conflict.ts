@@ -314,3 +314,4 @@ export function checkClassAgainstTasks(
 
   return { hasConflict: false };
 }
+

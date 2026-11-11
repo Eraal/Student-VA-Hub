@@ -1,25 +1,46 @@
 import * as React from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { CheckSquare } from "lucide-react";
+import { requireRolePage } from "@/lib/auth-helpers";
+import { Role } from "@prisma/client";
+import { getClientTasks, getLinkedStudentForClient } from "@/lib/services/task-service";
+import { ClientTasksView } from "@/components/client/tasks/client-tasks-view";
 
-export default function ClientTasksPage() {
+async function ClientTasksContent() {
+  const user = await requireRolePage(Role.CLIENT);
+  const [tasks, linked] = await Promise.all([
+    getClientTasks(user.id),
+    getLinkedStudentForClient(user.id),
+  ]);
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--color-text)]">
-          Tasks
-        </h1>
-        <p className="text-xs text-[var(--color-muted)]">
-          Tingnan ang status ng mga gawaing na-assign sa student.
-        </p>
-      </div>
-
-      <EmptyState
-        icon={CheckSquare}
-        title="Wala pang na-assign na tasks"
-        description="Wala ka pang naipapadalang task sa student VA. Dito mo makikita ang progress at deadlines ng bawat project."
-      />
-    </div>
+    <ClientTasksView
+      initialTasks={tasks}
+      linkedStudent={
+        linked
+          ? { id: linked.student.id, name: linked.student.name }
+          : null
+      }
+    />
   );
 }
 
+export default function ClientTasksPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="space-y-6 animate-pulse">
+          <div className="space-y-2">
+            <div className="h-6 w-48 rounded bg-[var(--color-border)]" />
+            <div className="h-4 w-72 rounded bg-[var(--color-border)]" />
+          </div>
+          <div className="h-10 w-full border-b border-[var(--color-border)]" />
+          <div className="space-y-3">
+            <div className="h-32 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]" />
+            <div className="h-32 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]" />
+          </div>
+        </div>
+      }
+    >
+      <ClientTasksContent />
+    </React.Suspense>
+  );
+}
