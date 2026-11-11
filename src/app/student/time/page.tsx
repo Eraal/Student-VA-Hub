@@ -1,25 +1,49 @@
 import * as React from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Clock } from "lucide-react";
+import { requireRolePage } from "@/lib/auth-helpers";
+import { Role } from "@prisma/client";
+import { getStudentTimeData } from "@/lib/services/time-service";
+import { StudentTimeView } from "@/components/student/time/student-time-view";
 
-export default function StudentTimePage() {
+interface StudentTimePageProps {
+  searchParams?: Promise<{ taskId?: string }>;
+}
+
+async function StudentTimeContent({
+  searchParams,
+}: {
+  searchParams?: Promise<{ taskId?: string }>;
+}) {
+  const user = await requireRolePage(Role.STUDENT);
+  const resolvedParams = searchParams ? await searchParams : undefined;
+  const timeData = await getStudentTimeData(user.id);
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--color-text)]">
-          Time Tracking
-        </h1>
-        <p className="text-xs text-[var(--color-muted)]">
-          Mag-Time In at Time Out habang gumagawa ng tasks.
-        </p>
-      </div>
-
-      <EmptyState
-        icon={Clock}
-        title="Walang active timer o logs"
-        description="Wala pang naka-log na oras. Piliin ang task at mag-Time In kapag ready ka nang magsimula ng trabaho."
-      />
-    </div>
+    <StudentTimeView
+      initialData={timeData}
+      preselectedTaskId={resolvedParams?.taskId}
+    />
   );
 }
 
+export default function StudentTimePage({ searchParams }: StudentTimePageProps) {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="space-y-6 animate-pulse">
+          <div className="space-y-2">
+            <div className="h-6 w-48 rounded bg-[var(--color-border)]" />
+            <div className="h-4 w-72 rounded bg-[var(--color-border)]" />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="h-16 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]" />
+            <div className="h-16 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]" />
+            <div className="h-16 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]" />
+          </div>
+          <div className="h-48 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]" />
+        </div>
+      }
+    >
+      <StudentTimeContent searchParams={searchParams} />
+    </React.Suspense>
+  );
+}

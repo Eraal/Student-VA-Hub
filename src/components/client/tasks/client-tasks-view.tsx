@@ -270,3 +270,4 @@ export function ClientTasksView({ initialTasks, linkedStudent }: ClientTasksView
     </div>
   );
 }
+
