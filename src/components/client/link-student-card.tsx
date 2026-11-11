@@ -417,3 +417,4 @@ export function LinkStudentCard({ initialLink }: LinkStudentCardProps) {
     </div>
   );
 }
+

@@ -129,3 +129,4 @@ export const updateClientProfileSchema = z
   );
 
 export type UpdateClientProfileInput = z.infer<typeof updateClientProfileSchema>;
+

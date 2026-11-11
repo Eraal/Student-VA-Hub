@@ -286,3 +286,4 @@ export function ClientProfileForm({ initialData }: ClientProfileFormProps) {
     </Card>
   );
 }
+

@@ -103,3 +103,4 @@ describe("Profile validation schemas", () => {
     });
   });
 });
+

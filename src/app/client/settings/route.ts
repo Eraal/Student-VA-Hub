@@ -4,3 +4,4 @@ export async function GET(request: Request) {
   const url = new URL("/client/profile", request.url);
   return NextResponse.redirect(url);
 }
+

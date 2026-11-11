@@ -51,3 +51,4 @@ export async function getStudentInviteDetailsAction() {
     data: details,
   };
 }
+

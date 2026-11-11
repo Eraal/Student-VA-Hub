@@ -1,24 +1,35 @@
 import * as React from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { CalendarDays } from "lucide-react";
+import { requireRolePage } from "@/lib/auth-helpers";
+import { Role } from "@prisma/client";
+import { getStudentSchedule } from "@/lib/services/schedule-service";
+import { ScheduleView } from "@/components/student/schedule/schedule-view";
+
+async function StudentScheduleContent() {
+  const user = await requireRolePage(Role.STUDENT);
+  const scheduleData = await getStudentSchedule(user.id);
+
+  return <ScheduleView initialData={scheduleData} />;
+}
 
 export default function StudentSchedulePage() {
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--color-text)]">
-          Class Schedule & Availability
-        </h1>
-        <p className="text-xs text-[var(--color-muted)]">
-          Pamahalaan ang iyong schedule para maiwasan ang conflict sa VA tasks.
-        </p>
-      </div>
-
-      <EmptyState
-        icon={CalendarDays}
-        title="Walang naka-set na schedule"
-        description="Wala ka pang nailalagay na class schedule o availability windows. Ilalagay dito ang oras ng pasok mo para maiwasan ang conflict sa VA work."
-      />
-    </div>
+    <React.Suspense
+      fallback={
+        <div className="space-y-6 animate-pulse">
+          <div className="space-y-2">
+            <div className="h-6 w-64 rounded bg-[var(--color-border)]" />
+            <div className="h-4 w-96 rounded bg-[var(--color-border)]" />
+          </div>
+          <div className="h-10 w-full border-b border-[var(--color-border)]" />
+          <div className="space-y-3">
+            <div className="h-28 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]" />
+            <div className="h-28 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]" />
+            <div className="h-28 rounded-md bg-[var(--color-surface)] border border-[var(--color-border)]" />
+          </div>
+        </div>
+      }
+    >
+      <StudentScheduleContent />
+    </React.Suspense>
   );
 }
