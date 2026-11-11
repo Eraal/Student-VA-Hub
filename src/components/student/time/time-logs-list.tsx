@@ -163,3 +163,4 @@ export function TimeLogsList({ logs, onRefresh }: TimeLogsListProps) {
     </div>
   );
 }
+

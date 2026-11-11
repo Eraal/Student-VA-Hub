@@ -27,9 +27,9 @@ describe("time-service", () => {
     studentId = student.id;
     clientId = client.id;
 
-    // Clean up any open logs for juan before test
+    // Clean up any open logs for juan that might be left over from this suite
     await prisma.timeLog.deleteMany({
-      where: { studentId },
+      where: { taskId: testTaskId },
     });
 
     // Create a temporary task to track time against
@@ -49,10 +49,15 @@ describe("time-service", () => {
 
   afterEach(async () => {
     await prisma.notification.deleteMany({
-      where: { userId: { in: [studentId, clientId] } },
+      where: { message: { contains: "Test Task for Timing" } },
     });
+    if (createdLogIds.length > 0) {
+      await prisma.timeLog.deleteMany({
+        where: { id: { in: createdLogIds } },
+      });
+    }
     await prisma.timeLog.deleteMany({
-      where: { studentId },
+      where: { taskId: testTaskId },
     });
     await prisma.task.deleteMany({
       where: { id: testTaskId },
@@ -155,3 +160,4 @@ describe("time-service", () => {
     });
   });
 });
+

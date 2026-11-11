@@ -38,3 +38,4 @@ export const correctionRequestSchema = z.object({
 });
 
 export type CorrectionRequestInput = z.infer<typeof correctionRequestSchema>;
+
