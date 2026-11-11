@@ -1,0 +1,190 @@
+@import "tailwindcss";
+@import "../../node_modules/tw-animate-css/dist/tw-animate.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ==========================================================================
+   Student VA-Hub — Design Tokens (Tailwind v4, CSS-only config)
+   See docs/DESIGN.md for the full rules.
+
+   Usage meanings (enforced by convention):
+     --color-class    → blue-600   — class schedule blocks ONLY
+     --color-work     → green-600  — VA work / task blocks ONLY
+     --color-conflict → red-600    — conflict alerts ONLY
+     --color-accent   → zinc-900   — primary buttons, active nav, links
+
+   Avoid: gradients, glassmorphism, glow, emoji icons, oversized radius.
+   ========================================================================== */
+
+@theme inline {
+  /* Fonts */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Base palette */
+  --color-bg: #ffffff;
+  --color-surface: #f9fafb;
+  /* gray-50  — card / panel background  */
+  --color-border: #e5e7eb;
+  /* gray-200 — borders                   */
+  --color-text: #111827;
+  /* gray-900 — primary text              */
+  --color-muted: #6b7280;
+  /* gray-500 — secondary / placeholder   */
+
+  /* Accent (near-black, neutral) */
+  --color-accent: #18181b;
+  /* zinc-900 — buttons, links, active nav */
+  --color-accent-hover: #3f3f46;
+  /* zinc-700 — hover state               */
+  --color-accent-fg: #ffffff;
+  /* text on top of accent                */
+
+  /* Meaning colors — use ONLY for their designated purpose */
+  --color-class: #2563eb;
+  /* blue-600  — class blocks              */
+  --color-class-bg: #eff6ff;
+  /* blue-50   — class block background    */
+  --color-work: #16a34a;
+  /* green-600 — VA work / task blocks     */
+  --color-work-bg: #f0fdf4;
+  /* green-50  — work block background     */
+  --color-conflict: #dc2626;
+  /* red-600   — conflict alerts           */
+  --color-conflict-bg: #fef2f2;
+  /* red-50    — conflict background       */
+
+  /* Shape */
+  --radius: 8px;
+  /* rounded-md — no xl or larger */
+  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  /* shadow-sm */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+
+  /* shadcn color aliases */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* -------------------------------------------------------------------------
+   Shadcn variables mapped directly to Design Tokens (Single Source of Truth)
+   ------------------------------------------------------------------------- */
+
+:root {
+  --radius: 8px;
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-bg);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-accent-fg);
+  --secondary: var(--color-surface);
+  --secondary-foreground: var(--color-text);
+  --muted: var(--color-surface);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-surface);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--color-conflict);
+  --destructive-foreground: #ffffff;
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-accent);
+
+  /* Sidebar */
+  --sidebar: var(--color-surface);
+  --sidebar-foreground: var(--color-text);
+  --sidebar-primary: var(--color-accent);
+  --sidebar-primary-foreground: var(--color-accent-fg);
+  --sidebar-accent: var(--color-border);
+  --sidebar-accent-foreground: var(--color-text);
+  --sidebar-border: var(--color-border);
+  --sidebar-ring: var(--color-accent);
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --card: #18181b;
+  --card-foreground: #f4f4f5;
+  --popover: #18181b;
+  --popover-foreground: #f4f4f5;
+  --primary: #f4f4f5;
+  --primary-foreground: #18181b;
+  --secondary: #27272a;
+  --secondary-foreground: #f4f4f5;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #f4f4f5;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #f4f4f5;
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #d4d4d8;
+
+  --sidebar: #18181b;
+  --sidebar-foreground: #f4f4f5;
+  --sidebar-primary: #f4f4f5;
+  --sidebar-primary-foreground: #18181b;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #f4f4f5;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #d4d4d8;
+}
+
+/* -------------------------------------------------------------------------
+   Base styles
+   ------------------------------------------------------------------------- */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Accessible focus ring matching accent */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+
+/* Accessible focus ring matching accent */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
