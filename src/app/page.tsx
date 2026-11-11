@@ -1,12 +1,30 @@
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+
+async function HomeRedirect() {
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  if (session.user.role === "STUDENT") {
+    redirect("/student");
+  }
+
+  if (session.user.role === "CLIENT") {
+    redirect("/client");
+  }
+
+  redirect("/login");
+  return null;
+}
+
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-text)]">
-        Student VA-Hub
-      </h1>
-      <p className="text-sm text-[var(--color-muted)]">
-        Scaffold complete. Auth and pages come next.
-      </p>
-    </main>
+    <Suspense fallback={null}>
+      <HomeRedirect />
+    </Suspense>
   );
 }
