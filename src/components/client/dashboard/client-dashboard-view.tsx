@@ -418,3 +418,4 @@ export function ClientDashboardView({ data, clientName }: ClientDashboardViewPro
     </div>
   );
 }
+

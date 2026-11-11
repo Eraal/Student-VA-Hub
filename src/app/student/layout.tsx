@@ -2,11 +2,15 @@ import * as React from "react";
 import { AppTopbar } from "@/components/layout/app-topbar";
 import { StudentNav } from "@/components/layout/student-nav";
 import { getCurrentUser } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/prisma";
 
 async function StudentTopbar() {
   const user = await getCurrentUser();
   if (!user) return null;
-  return <AppTopbar user={user} />;
+  const unreadCount = await prisma.notification.count({
+    where: { userId: user.id, readAt: null },
+  });
+  return <AppTopbar user={user} unreadCount={unreadCount} />;
 }
 
 export default function StudentLayout({

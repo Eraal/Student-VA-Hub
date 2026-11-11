@@ -162,6 +162,12 @@ export function LoginForm() {
               >
                 Password
               </Label>
+              <Link
+                href="/forgot-password"
+                className="text-[11px] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:underline"
+              >
+                Forgot password?
+              </Link>
             </div>
             <Input
               id="login-password"

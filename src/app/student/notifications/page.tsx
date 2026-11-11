@@ -1,25 +1,33 @@
 import * as React from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Bell } from "lucide-react";
+import { requireRolePage } from "@/lib/auth-helpers";
+import { Role } from "@prisma/client";
+import { getUserNotifications } from "@/lib/services/notification-service";
+import { NotificationsView } from "@/components/notifications/notifications-view";
 
-export default function StudentNotificationsPage() {
+async function StudentNotificationsContent() {
+  const user = await requireRolePage(Role.STUDENT);
+  const { notifications, unreadCount } = await getUserNotifications(user.id);
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-[var(--color-text)]">
-          Notifications
-        </h1>
-        <p className="text-xs text-[var(--color-muted)]">
-          Mga alert at updates sa iyong tasks, schedule, at hours.
-        </p>
-      </div>
-
-      <EmptyState
-        icon={Bell}
-        title="Walang bagong notification"
-        description="Updated ka sa lahat! Dito lalabas ang mga update kapag may bagong assigned task, schedule conflicts, o na-approve na timesheet."
-      />
-    </div>
+    <NotificationsView
+      initialNotifications={notifications}
+      initialUnreadCount={unreadCount}
+      role="STUDENT"
+    />
   );
 }
 
+export default function StudentNotificationsPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="space-y-4 animate-pulse max-w-3xl">
+          <div className="h-6 w-48 rounded bg-[var(--color-border)]" />
+          <div className="h-44 rounded-md bg-[var(--color-surface)]" />
+        </div>
+      }
+    >
+      <StudentNotificationsContent />
+    </React.Suspense>
+  );
+}

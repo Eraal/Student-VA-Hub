@@ -471,3 +471,4 @@ export async function getClientDashboardData(clientId: string): Promise<ClientDa
     pendingApproval,
   };
 }
+

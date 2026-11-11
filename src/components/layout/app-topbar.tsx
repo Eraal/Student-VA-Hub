@@ -23,9 +23,10 @@ interface AppTopbarProps {
     email?: string | null;
     role: Role;
   };
+  unreadCount?: number;
 }
 
-export function AppTopbar({ user }: AppTopbarProps) {
+export function AppTopbar({ user, unreadCount = 0 }: AppTopbarProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
@@ -84,13 +85,16 @@ export function AppTopbar({ user }: AppTopbarProps) {
         <Link
           href={notificationsUrl}
           title="Notifications"
-          className={`flex size-8 items-center justify-center rounded-md border text-xs font-medium transition-colors ${
+          className={`relative flex size-8 items-center justify-center rounded-md border text-xs font-medium transition-colors ${
             isNotificationsActive
               ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-fg)]"
               : "border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]"
           }`}
         >
           <Bell className="size-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex size-3 items-center justify-center rounded-full bg-[var(--color-conflict)] ring-2 ring-[var(--color-bg)]" />
+          )}
         </Link>
 
         {/* Profile Menu Dropdown */}
