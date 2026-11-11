@@ -48,3 +48,4 @@ describe("getDefaultRolePath", () => {
     expect(getDefaultRolePath(undefined)).toBe("/login");
   });
 });
+

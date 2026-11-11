@@ -32,3 +32,4 @@ export async function getClientDataAction() {
     user: authCheck.user,
   };
 }
+

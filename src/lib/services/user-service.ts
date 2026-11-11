@@ -126,3 +126,4 @@ export async function validateCredentials(email: string, password: string) {
     role: user.role,
   };
 }
+
