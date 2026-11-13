@@ -2,6 +2,7 @@ import * as React from "react";
 import { cookies } from "next/headers";
 import { AppTopbar } from "@/components/layout/app-topbar";
 import { ClientNav } from "@/components/layout/client-nav";
+import { LiveUpdates } from "@/components/layout/live-updates";
 import { getCurrentUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { getClientDashboardData } from "@/lib/services/dashboard-service";
@@ -49,6 +50,7 @@ export default function ClientLayout({
 }) {
   return (
     <div className="min-h-screen min-h-dvh bg-[var(--color-bg)] flex flex-col">
+      <LiveUpdates />
       {/* Top Bar inside Suspense so layout shell can partially prerender */}
       <React.Suspense
         fallback={

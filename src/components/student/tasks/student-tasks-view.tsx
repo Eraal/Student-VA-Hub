@@ -36,11 +36,24 @@ import {
   MoreHorizontal,
   X,
   AlertCircle,
+  Square,
 } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { TaskStatus, StudentResponse, Role } from "@prisma/client";
+import {
+  ActiveTimeLogSummary,
+  getTaskTimeActionState,
+} from "@/lib/task-time-state";
 
 interface StudentTasksViewProps {
   initialTasks: TaskWithDetails[];
+  initialActiveLog?: ActiveTimeLogSummary | null;
 }
 
 type TabKey = "ALL" | "TODO" | "DOING" | "DONE";
@@ -51,11 +64,18 @@ interface RescheduleModalState {
   taskTitle: string;
 }
 
-export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
+export function StudentTasksView({
+  initialTasks,
+  initialActiveLog,
+}: StudentTasksViewProps) {
   const router = useRouter();
   const [tasks, setTasks] = React.useState<TaskWithDetails[]>(initialTasks);
+  const [activeLog, setActiveLog] = React.useState<ActiveTimeLogSummary | null | undefined>(
+    initialActiveLog ?? null
+  );
   const [activeTab, setActiveTab] = React.useState<TabKey>("ALL");
   const [now, setNow] = React.useState<Date>(() => new Date());
+  const [selectedTaskId, setSelectedTaskId] = React.useState<string | null>(null);
 
   // Reschedule Dialog state
   const [rescheduleModal, setRescheduleModal] = React.useState<RescheduleModalState>({
@@ -73,13 +93,56 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
     setTasks(initialTasks);
   }, [initialTasks]);
 
-  // Keep now updated periodically
   React.useEffect(() => {
+    setActiveLog(initialActiveLog ?? null);
+  }, [initialActiveLog]);
+
+  // Keep now updated (every second if a session is running, else every minute)
+  React.useEffect(() => {
+    const intervalMs = activeLog ? 1000 : 60000;
     const timer = setInterval(() => {
       setNow(new Date());
-    }, 60000);
+    }, intervalMs);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeLog]);
+
+  // Auto-refresh when page mounts or regains focus / visibility
+  React.useEffect(() => {
+    router.refresh();
+  }, [router]);
+
+  React.useEffect(() => {
+    const handleSync = () => {
+      router.refresh();
+    };
+    window.addEventListener("focus", handleSync);
+    window.addEventListener("pageshow", handleSync);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        router.refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleSync);
+      window.removeEventListener("pageshow", handleSync);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [router]);
+
+  // Periodic poll if an active session is running so Tasks page stays in sync
+  React.useEffect(() => {
+    if (!activeLog) return;
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [activeLog, router]);
+
+  const selectedTask = React.useMemo(() => {
+    if (!selectedTaskId) return null;
+    return tasks.find((t) => t.id === selectedTaskId) ?? null;
+  }, [selectedTaskId, tasks]);
 
   // Filtered task counts for tabs
   const countAll = tasks.length;
@@ -404,11 +467,13 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
                     <TaskCard
                       key={task.id}
                       task={task}
+                      activeLog={activeLog}
                       now={now}
                       onAccept={handleAccept}
                       isAccepting={isSubmittingAccept === task.id}
                       onOpenReschedule={openRescheduleModal}
                       onStatusChange={handleStatusChange}
+                      onSelectTask={(t) => setSelectedTaskId(t.id)}
                     />
                   ))}
                 </div>
@@ -431,11 +496,13 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
                     <TaskCard
                       key={task.id}
                       task={task}
+                      activeLog={activeLog}
                       now={now}
                       onAccept={handleAccept}
                       isAccepting={isSubmittingAccept === task.id}
                       onOpenReschedule={openRescheduleModal}
                       onStatusChange={handleStatusChange}
+                      onSelectTask={(t) => setSelectedTaskId(t.id)}
                     />
                   ))}
                 </div>
@@ -458,11 +525,13 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
                     <TaskCard
                       key={task.id}
                       task={task}
+                      activeLog={activeLog}
                       now={now}
                       onAccept={handleAccept}
                       isAccepting={isSubmittingAccept === task.id}
                       onOpenReschedule={openRescheduleModal}
                       onStatusChange={handleStatusChange}
+                      onSelectTask={(t) => setSelectedTaskId(t.id)}
                     />
                   ))}
                 </div>
@@ -485,11 +554,13 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
                     <TaskCard
                       key={task.id}
                       task={task}
+                      activeLog={activeLog}
                       now={now}
                       onAccept={handleAccept}
                       isAccepting={isSubmittingAccept === task.id}
                       onOpenReschedule={openRescheduleModal}
                       onStatusChange={handleStatusChange}
+                      onSelectTask={(t) => setSelectedTaskId(t.id)}
                     />
                   ))}
                 </div>
@@ -526,11 +597,13 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
                 <TaskCard
                   key={task.id}
                   task={task}
+                  activeLog={activeLog}
                   now={now}
                   onAccept={handleAccept}
                   isAccepting={isSubmittingAccept === task.id}
                   onOpenReschedule={openRescheduleModal}
                   onStatusChange={handleStatusChange}
+                  onSelectTask={(t) => setSelectedTaskId(t.id)}
                 />
               ))}
             </div>
@@ -634,6 +707,23 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
           </div>
         </div>
       )}
+      {/* TASK DETAIL SHEET */}
+      <StudentTaskDetailSheet
+        task={selectedTask}
+        activeLog={activeLog}
+        now={now}
+        isOpen={Boolean(selectedTask)}
+        onClose={() => setSelectedTaskId(null)}
+        onAccept={handleAccept}
+        isAccepting={Boolean(
+          isSubmittingAccept && selectedTask && isSubmittingAccept === selectedTask.id
+        )}
+        onOpenReschedule={(t) => {
+          setSelectedTaskId(null);
+          openRescheduleModal(t);
+        }}
+        onStatusChange={handleStatusChange}
+      />
     </PageContainer>
   );
 }
@@ -644,20 +734,24 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
 
 interface TaskCardProps {
   task: TaskWithDetails;
+  activeLog?: ActiveTimeLogSummary | null;
   now: Date;
   onAccept: (taskId: string) => Promise<void>;
   isAccepting: boolean;
   onOpenReschedule: (task: TaskWithDetails) => void;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => Promise<void>;
+  onSelectTask?: (task: TaskWithDetails) => void;
 }
 
 function TaskCard({
   task,
+  activeLog,
   now,
   onAccept,
   isAccepting,
   onOpenReschedule,
   onStatusChange,
+  onSelectTask,
 }: TaskCardProps) {
   const isDone = task.status === TaskStatus.DONE;
   const isPendingResponse = !task.studentResponse && !isDone;
@@ -665,6 +759,9 @@ function TaskCard({
     task.studentResponse === StudentResponse.RESCHEDULE_REQUESTED && !isDone;
   const isAcceptedAndNotDone =
     task.studentResponse === StudentResponse.ACCEPTED && !isDone;
+
+  const isRunning = Boolean(activeLog && activeLog.taskId === task.id);
+  const timeActionState = getTaskTimeActionState(task, activeLog, now);
 
   const dueDate = parseSafeDate(task.dueAt);
   const isOverdue = !isDone && Boolean(dueDate && dueDate.getTime() < now.getTime());
@@ -731,8 +828,15 @@ function TaskCard({
       data-testid="task-card"
       data-status={task.status}
       data-response={task.studentResponse ?? "PENDING"}
+      onClick={() => onSelectTask?.(task)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelectTask?.(task);
+        }
+      }}
       className={cn(
-        "group relative rounded-2xl border-[1.5px] border-[#0F172A] bg-white p-3.5 sm:p-4 shadow-[3px_3px_0px_0px_#0F172A] overflow-hidden transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A] focus-visible:ring-offset-2 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_#0F172A]",
+        "group relative rounded-2xl border-[1.5px] border-[#0F172A] bg-white p-3.5 sm:p-4 shadow-[3px_3px_0px_0px_#0F172A] overflow-hidden transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A] focus-visible:ring-offset-2 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_#0F172A] cursor-pointer",
         isDone && "opacity-70 hover:opacity-100"
       )}
     >
@@ -856,6 +960,11 @@ function TaskCard({
                     </div>
                     <span className="font-medium text-slate-600">
                       {`${formatHours(task.loggedHours)} of ${formatHours(task.estHours)} logged`}
+                      {isRunning && (
+                        <span className="text-[#166534] font-semibold ml-1">
+                          (running)
+                        </span>
+                      )}
                     </span>
                   </div>
                 )}
@@ -916,20 +1025,72 @@ function TaskCard({
 
             {/* State 2: Accepted and not done */}
             {isAcceptedAndNotDone && (
-              <Link
-                href={`/student/time?taskId=${task.id}`}
-                onClick={(e) => e.stopPropagation()}
-                className="inline-block"
-              >
-                <Button
-                  type="button"
-                  data-testid="task-time-in"
-                  className="bg-[#0F172A] text-white font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-slate-800 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#0F172A] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none min-h-[38px] px-3.5 text-xs rounded-lg cursor-pointer gap-1.5"
-                >
-                  <Play className="size-3.5 fill-[#16A34A] text-[#16A34A]" />
-                  <span>Time In</span>
-                </Button>
-              </Link>
+              <>
+                {timeActionState.type === "RUNNING" && (
+                  <div className="flex items-center gap-2">
+                    <span
+                      data-testid="task-running-indicator"
+                      className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#16A34A] bg-[#F0FDF4] px-2.5 py-1 text-xs font-bold text-[#166534] shadow-[1.5px_1.5px_0px_0px_#16A34A]"
+                    >
+                      <span className="size-2 rounded-full bg-[#16A34A] animate-pulse" aria-hidden="true" />
+                      <span>Running</span>
+                      <span className="font-mono text-[11px] text-[#166534]">({timeActionState.elapsedFormatted})</span>
+                    </span>
+                    <Link
+                      href="/student/time"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-block"
+                    >
+                      <Button
+                        type="button"
+                        data-testid="task-time-out"
+                        variant="outline"
+                        className="bg-white text-[#0F172A] border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-[#FAF7F2] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#0F172A] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none min-h-[38px] px-3.5 text-xs font-bold rounded-lg cursor-pointer gap-1.5"
+                      >
+                        <Square className="size-3.5 fill-[#DC2626] text-[#DC2626]" />
+                        <span>Time out</span>
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+
+                {timeActionState.type === "BLOCKED_BY_OTHER_SESSION" && (
+                  <div className="flex flex-col items-end gap-1">
+                    <Button
+                      type="button"
+                      data-testid="task-time-in"
+                      disabled
+                      aria-disabled="true"
+                      title={timeActionState.reason}
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-[#0F172A]/50 text-white/80 font-bold border-[1.5px] border-[#0F172A]/40 shadow-none min-h-[38px] px-3.5 text-xs rounded-lg cursor-not-allowed gap-1.5 opacity-60"
+                    >
+                      <Play className="size-3.5 fill-slate-400 text-slate-400" />
+                      <span>Time In</span>
+                    </Button>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {timeActionState.reason}
+                    </span>
+                  </div>
+                )}
+
+                {timeActionState.type === "CAN_TIME_IN" && (
+                  <Link
+                    href={timeActionState.href}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-block"
+                  >
+                    <Button
+                      type="button"
+                      data-testid="task-time-in"
+                      className="bg-[#0F172A] text-white font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-slate-800 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#0F172A] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none min-h-[38px] px-3.5 text-xs rounded-lg cursor-pointer gap-1.5"
+                    >
+                      <Play className="size-3.5 fill-[#16A34A] text-[#16A34A]" />
+                      <span>Time In</span>
+                    </Button>
+                  </Link>
+                )}
+              </>
             )}
 
             {/* State 3: Reschedule requested */}
@@ -1146,7 +1307,12 @@ function TaskCard({
                     />
                   </div>
                   <span className="font-medium text-[11px] text-slate-600 shrink-0">
-                    {`${formatHours(task.loggedHours)} of ${formatHours(task.estHours)}`}
+                    {`${formatHours(task.loggedHours)} of ${formatHours(task.estHours)} logged`}
+                    {isRunning && (
+                      <span className="text-[#166534] font-semibold ml-1">
+                        (running)
+                      </span>
+                    )}
                   </span>
                 </div>
               )}
@@ -1178,20 +1344,70 @@ function TaskCard({
 
           {isAcceptedAndNotDone && (
             <div className="pt-1 w-full">
-              <Link
-                href={`/student/time?taskId=${task.id}`}
-                onClick={(e) => e.stopPropagation()}
-                className="block w-full"
-              >
-                <Button
-                  type="button"
-                  data-testid="task-time-in"
-                  className="w-full min-h-[44px] h-11 bg-[#0F172A] text-white font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-slate-800 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-xs rounded-lg cursor-pointer gap-2"
+              {timeActionState.type === "RUNNING" && (
+                <div className="flex items-center gap-2 w-full">
+                  <span
+                    data-testid="task-running-indicator"
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border-[1.5px] border-[#16A34A] bg-[#F0FDF4] min-h-[44px] h-11 px-3 text-xs font-bold text-[#166534] shadow-[2px_2px_0px_0px_#16A34A]"
+                  >
+                    <span className="size-2 rounded-full bg-[#16A34A] animate-pulse" aria-hidden="true" />
+                    <span>Running</span>
+                    <span className="font-mono text-xs text-[#166534]">({timeActionState.elapsedFormatted})</span>
+                  </span>
+                  <Link
+                    href="/student/time"
+                    onClick={(e) => e.stopPropagation()}
+                    className="shrink-0"
+                  >
+                    <Button
+                      type="button"
+                      data-testid="task-time-out"
+                      variant="outline"
+                      className="min-h-[44px] h-11 bg-white text-[#0F172A] border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-[#FAF7F2] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-xs font-bold rounded-lg cursor-pointer gap-1.5 px-4"
+                    >
+                      <Square className="size-3.5 fill-[#DC2626] text-[#DC2626]" />
+                      <span>Time out</span>
+                    </Button>
+                  </Link>
+                </div>
+              )}
+
+              {timeActionState.type === "BLOCKED_BY_OTHER_SESSION" && (
+                <div className="space-y-1 w-full">
+                  <Button
+                    type="button"
+                    data-testid="task-time-in"
+                    disabled
+                    aria-disabled="true"
+                    title={timeActionState.reason}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full min-h-[44px] h-11 bg-[#0F172A]/50 text-white/80 font-bold border-[1.5px] border-[#0F172A]/40 shadow-none text-xs rounded-lg cursor-not-allowed gap-2 opacity-60"
+                  >
+                    <Play className="size-4 fill-slate-400 text-slate-400" />
+                    <span>Time In</span>
+                  </Button>
+                  <p className="text-[11px] text-center text-slate-500 font-medium">
+                    {timeActionState.reason}
+                  </p>
+                </div>
+              )}
+
+              {timeActionState.type === "CAN_TIME_IN" && (
+                <Link
+                  href={timeActionState.href}
+                  onClick={(e) => e.stopPropagation()}
+                  className="block w-full"
                 >
-                  <Play className="size-4 fill-[#16A34A] text-[#16A34A]" />
-                  <span>Time In</span>
-                </Button>
-              </Link>
+                  <Button
+                    type="button"
+                    data-testid="task-time-in"
+                    className="w-full min-h-[44px] h-11 bg-[#0F172A] text-white font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-slate-800 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-xs rounded-lg cursor-pointer gap-2"
+                  >
+                    <Play className="size-4 fill-[#16A34A] text-[#16A34A]" />
+                    <span>Time In</span>
+                  </Button>
+                </Link>
+              )}
             </div>
           )}
 
@@ -1203,6 +1419,329 @@ function TaskCard({
         </div>
       </div>
     </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// STUDENT TASK DETAIL SHEET
+// ---------------------------------------------------------------------------
+
+interface StudentTaskDetailSheetProps {
+  task: TaskWithDetails | null;
+  activeLog: ActiveTimeLogSummary | null | undefined;
+  now: Date;
+  isOpen: boolean;
+  onClose: () => void;
+  onAccept: (taskId: string) => Promise<void>;
+  isAccepting: boolean;
+  onOpenReschedule: (task: TaskWithDetails) => void;
+  onStatusChange: (taskId: string, newStatus: TaskStatus) => Promise<void>;
+}
+
+function StudentTaskDetailSheet({
+  task,
+  activeLog,
+  now,
+  isOpen,
+  onClose,
+  onAccept,
+  isAccepting,
+  onOpenReschedule,
+  onStatusChange,
+}: StudentTaskDetailSheetProps) {
+  if (!task) return null;
+
+  const isDone = task.status === TaskStatus.DONE;
+  const isPendingResponse = !task.studentResponse && !isDone;
+  const isRescheduleRequested =
+    task.studentResponse === StudentResponse.RESCHEDULE_REQUESTED && !isDone;
+  const isAcceptedAndNotDone =
+    task.studentResponse === StudentResponse.ACCEPTED && !isDone;
+
+  const isRunning = Boolean(activeLog && activeLog.taskId === task.id);
+  const timeActionState = getTaskTimeActionState(task, activeLog, now);
+
+  const dueDate = parseSafeDate(task.dueAt);
+  const isOverdue = !isDone && Boolean(dueDate && dueDate.getTime() < now.getTime());
+  const dueDay = dueDate ? formatDate(dueDate, "yyyy-MM-dd") : "";
+  const nowDay = formatDate(now, "yyyy-MM-dd");
+  const isDueToday = !isDone && dueDay === nowDay;
+
+  let relativeDueLabel = dueDate ? `Due ${formatRelative(dueDate, now)}` : "—";
+  if (isOverdue) relativeDueLabel = "Overdue";
+  else if (isDueToday) relativeDueLabel = "Due today";
+
+  const absoluteDueText = dueDate
+    ? formatDate(dueDate, "EEE, MMM d, h:mm a")
+    : "—";
+
+  const estHours = Math.max(0.1, task.estHours);
+  const progressPercent = Math.min(
+    100,
+    Math.max(0, Math.round((task.loggedHours / estHours) * 100))
+  );
+
+  const validStatusTransitions: { status: TaskStatus; label: string }[] = [];
+  if (task.status === TaskStatus.TODO) {
+    validStatusTransitions.push({ status: TaskStatus.DOING, label: "Mark as in progress" });
+    validStatusTransitions.push({ status: TaskStatus.DONE, label: "Mark as done" });
+  } else if (task.status === TaskStatus.DOING) {
+    validStatusTransitions.push({ status: TaskStatus.TODO, label: "Mark as to do" });
+    validStatusTransitions.push({ status: TaskStatus.DONE, label: "Mark as done" });
+  } else if (task.status === TaskStatus.DONE) {
+    validStatusTransitions.push({ status: TaskStatus.TODO, label: "Mark as to do" });
+    validStatusTransitions.push({ status: TaskStatus.DOING, label: "Mark as in progress" });
+  }
+
+  return (
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent
+        side="responsive"
+        data-testid="student-task-sheet"
+        className="w-full sm:max-w-lg overflow-y-auto space-y-6"
+      >
+        <SheetHeader className="space-y-2 pb-4 border-b border-[#E5DFD5]">
+          <div className="flex flex-wrap items-center gap-2 pr-8">
+            <SheetTitle className="font-display text-xl font-bold text-[#0F172A] leading-snug">
+              {task.title}
+            </SheetTitle>
+            <StatusBadge status={task.status} />
+            {(isPendingResponse || isRescheduleRequested) && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-0.5 text-xs font-bold transition-all",
+                  TONE_STYLES[getResponseLabel(task.studentResponse, Role.STUDENT).tone]
+                )}
+              >
+                {getResponseLabel(task.studentResponse, Role.STUDENT).label}
+              </span>
+            )}
+          </div>
+          <SheetDescription className="sr-only">
+            Task details for {task.title}
+          </SheetDescription>
+        </SheetHeader>
+
+        {/* Reschedule callout if requested */}
+        {isRescheduleRequested && (
+          <div className="flex items-start gap-3 rounded-xl border-[1.5px] border-[#D97706] bg-[#FFFBEB] p-3.5 text-xs text-[#92400E] shadow-[2px_2px_0px_0px_#D97706]">
+            <AlertTriangle className="size-4 shrink-0 mt-0.5 text-[#D97706]" />
+            <div className="space-y-1">
+              <div className="font-bold text-sm text-[#92400E]">
+                You asked to reschedule
+              </div>
+              <p className="text-slate-800 leading-relaxed font-normal">
+                {task.rescheduleReason || "Waiting for your client to reply"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Hours warning if any */}
+        {task.hoursWarning && (
+          <div className="flex items-start gap-3 rounded-xl border-[1.5px] border-[#D97706] bg-[#FFFBEB] p-3 text-xs text-[#92400E]">
+            <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+            <span>This task exceeds your usual daily available hours.</span>
+          </div>
+        )}
+
+        {/* Description */}
+        {task.description && (
+          <div className="space-y-1.5">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Description
+            </h4>
+            <p className="text-sm text-[#0F172A] whitespace-pre-wrap leading-relaxed bg-[#FAF7F2] p-3 rounded-xl border border-[#E5DFD5]">
+              {task.description}
+            </p>
+          </div>
+        )}
+
+        {/* Metadata Details */}
+        <div className="space-y-3 rounded-xl border-[1.5px] border-[#0F172A] bg-white p-4 shadow-[2px_2px_0px_0px_#0F172A]">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-600">Client</span>
+            <span className="font-bold text-[#0F172A]">{task.clientName || "Client"}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-600">Deadline</span>
+            <div className="text-right">
+              <span className={cn("font-bold block", isOverdue ? "text-[#DC2626]" : "text-[#0F172A]")}>
+                {relativeDueLabel}
+              </span>
+              <span className="text-[11px] text-slate-500">{absoluteDueText}</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-slate-600">Estimate</span>
+            <span className="font-bold text-[#0F172A]">{formatHours(task.estHours)}</span>
+          </div>
+        </div>
+
+        {/* Time Tracking & Progress */}
+        <div className="space-y-3 rounded-xl border-[1.5px] border-[#0F172A] bg-white p-4 shadow-[2px_2px_0px_0px_#0F172A]">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Logged hours
+            </h4>
+            <div className="text-xs">
+              {isDone ? (
+                <span className="font-bold text-[#0F172A]">
+                  {formatHours(task.loggedHours)} logged
+                </span>
+              ) : (
+                <span className="font-bold text-[#0F172A]">
+                  {formatHours(task.loggedHours)} of {formatHours(task.estHours)} logged
+                  {isRunning && (
+                    <span className="text-[#166534] font-bold ml-1">
+                      (running)
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {!isDone && (
+            <div
+              className="h-2 w-full rounded-full bg-slate-200 border border-slate-300 overflow-hidden"
+              role="progressbar"
+              aria-valuenow={task.loggedHours}
+              aria-valuemin={0}
+              aria-valuemax={task.estHours}
+            >
+              <div
+                className="h-full bg-[#16A34A] rounded-full transition-all"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Primary Action Block in Detail Sheet */}
+        <div className="space-y-3 pt-2 border-t border-[#E5DFD5]">
+          {isPendingResponse && (
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                data-testid="task-accept"
+                onClick={() => onAccept(task.id)}
+                disabled={isAccepting}
+                className="w-full min-h-[44px] h-11 bg-[#16A34A] text-white font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-[#15803D] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-xs rounded-lg cursor-pointer gap-1.5"
+              >
+                {isAccepting ? (
+                  <Loader2 className="size-4 animate-spin mr-1" />
+                ) : (
+                  <Check className="size-4 mr-1" strokeWidth={3} />
+                )}
+                <span>Accept task</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                data-testid="task-reschedule"
+                onClick={() => onOpenReschedule(task)}
+                disabled={isAccepting}
+                className="w-full text-slate-700 hover:text-[#0F172A] hover:bg-[#EFEAE2] font-semibold min-h-[40px] text-xs rounded-lg cursor-pointer"
+              >
+                <RotateCcw className="size-3.5 mr-1.5" />
+                <span>Ask to reschedule</span>
+              </Button>
+            </div>
+          )}
+
+          {isAcceptedAndNotDone && (
+            <div className="space-y-3">
+              {timeActionState.type === "RUNNING" && (
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-xl border-[1.5px] border-[#16A34A] bg-[#F0FDF4] shadow-[2px_2px_0px_0px_#16A34A]">
+                  <span
+                    data-testid="task-running-indicator"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#166534]"
+                  >
+                    <span className="size-2 rounded-full bg-[#16A34A] animate-pulse" aria-hidden="true" />
+                    <span>Running</span>
+                    <span className="font-mono text-xs">({timeActionState.elapsedFormatted})</span>
+                  </span>
+                  <Link href="/student/time" className="block shrink-0">
+                    <Button
+                      type="button"
+                      data-testid="task-time-out"
+                      variant="outline"
+                      className="w-full sm:w-auto bg-white text-[#0F172A] border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-[#FAF7F2] text-xs font-bold rounded-lg cursor-pointer gap-1.5 min-h-[40px]"
+                    >
+                      <Square className="size-3.5 fill-[#DC2626] text-[#DC2626]" />
+                      <span>Time out</span>
+                    </Button>
+                  </Link>
+                </div>
+              )}
+
+              {timeActionState.type === "BLOCKED_BY_OTHER_SESSION" && (
+                <div className="space-y-1.5">
+                  <Button
+                    type="button"
+                    data-testid="task-time-in"
+                    disabled
+                    aria-disabled="true"
+                    title={timeActionState.reason}
+                    className="w-full min-h-[44px] h-11 bg-[#0F172A]/50 text-white/80 font-bold border-[1.5px] border-[#0F172A]/40 shadow-none text-xs rounded-lg cursor-not-allowed gap-2 opacity-60"
+                  >
+                    <Play className="size-4 fill-slate-400 text-slate-400" />
+                    <span>Time In</span>
+                  </Button>
+                  <p className="text-xs text-center text-slate-500 font-medium">
+                    {timeActionState.reason}
+                  </p>
+                </div>
+              )}
+
+              {timeActionState.type === "CAN_TIME_IN" && (
+                <Link href={timeActionState.href} className="block w-full">
+                  <Button
+                    type="button"
+                    data-testid="task-time-in"
+                    className="w-full min-h-[44px] h-11 bg-[#0F172A] text-white font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-slate-800 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none text-xs rounded-lg cursor-pointer gap-2"
+                  >
+                    <Play className="size-4 fill-[#16A34A] text-[#16A34A]" />
+                    <span>Time In</span>
+                  </Button>
+                </Link>
+              )}
+
+              {/* Status Transitions and Reschedule Option */}
+              <div className="flex items-center justify-between pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  data-testid="task-reschedule"
+                  onClick={() => onOpenReschedule(task)}
+                  className="text-xs text-slate-600 hover:text-[#0F172A] cursor-pointer"
+                >
+                  <RotateCcw className="size-3.5 mr-1" />
+                  <span>Ask to reschedule</span>
+                </Button>
+                {validStatusTransitions.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    {validStatusTransitions.map((st) => (
+                      <Button
+                        key={st.status}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onStatusChange(task.id, st.status)}
+                        className="text-xs font-semibold h-8 cursor-pointer"
+                      >
+                        {st.label}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

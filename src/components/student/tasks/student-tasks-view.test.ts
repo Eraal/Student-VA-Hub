@@ -208,4 +208,64 @@ describe("StudentTasksView Redesign", () => {
     expect(html).toContain("No tasks yet.");
     expect(html).toContain("When your client assigns one, it will show up here.");
   });
+
+  describe("Open time log & running session button state logic", () => {
+    const activeLogOnTask2 = {
+      id: "active-log-2",
+      taskId: "task-2",
+      timeIn: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+    };
+
+    it("replaces Time In with Running indicator (green dot, elapsed time) and Time out action for running task", () => {
+      const html = renderToString(
+        React.createElement(StudentTasksView, {
+          initialTasks: sampleTasks,
+          initialActiveLog: activeLogOnTask2,
+        })
+      );
+
+      // task-2 has the open log:
+      expect(html).toContain('data-testid="task-running-indicator"');
+      expect(html).toContain("Running");
+      expect(html).toContain("15m");
+      expect(html).toContain('data-testid="task-time-out"');
+      expect(html).toContain('href="/student/time"');
+
+      // task-2 shows "(running)" appended to its logged hours
+      expect(html).toContain("1h of 2h logged");
+      expect(html).toContain("(running)");
+    });
+
+    it("disables Time In and shows reason 'Finish your current session first' on other accepted tasks while a session is open", () => {
+      const html = renderToString(
+        React.createElement(StudentTasksView, {
+          initialTasks: sampleTasks,
+          initialActiveLog: activeLogOnTask2,
+        })
+      );
+
+      // task-3 is an accepted task, but task-2 is currently running
+      expect(html).toContain("Finish your current session first");
+      expect(html).toContain('title="Finish your current session first"');
+
+      // task-3 logged hours should NOT say (running)
+      expect(html).toContain("0h of 4h logged");
+    });
+
+    it("allows Time In normally when no session is open", () => {
+      const html = renderToString(
+        React.createElement(StudentTasksView, {
+          initialTasks: sampleTasks,
+          initialActiveLog: null,
+        })
+      );
+
+      // task-2 offers Time In
+      expect(html).toContain('data-testid="task-time-in"');
+      expect(html).toContain("/student/time?taskId=task-2");
+      expect(html).not.toContain('data-testid="task-running-indicator"');
+      expect(html).not.toContain("Finish your current session first");
+      expect(html).not.toContain("(running)");
+    });
+  });
 });

@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import {
   markNotificationAsRead,
@@ -45,3 +46,23 @@ export async function markAllNotificationsReadAction() {
   }
 }
 
+/**
+ * Retrieves the single latest notification for the currently authenticated user.
+ * Used by LiveUpdates to display a toast when a new notification arrives.
+ */
+export async function getLatestNotificationAction() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+
+  return prisma.notification.findFirst({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      message: true,
+      type: true,
+      createdAt: true,
+      readAt: true,
+    },
+  });
+}

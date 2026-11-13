@@ -5,6 +5,7 @@ import { canStudentTimeIn } from "../conflict";
 import type { CorrectionRequestInput } from "../validations/time";
 import { createNotification } from "../notifications";
 import { formatHours } from "../format";
+import { publishLiveUpdate } from "../live-updates";
 
 export interface FormattedTimeLog {
   id: string;
@@ -36,14 +37,40 @@ export { calculateLoggedHours, calculateLoggedMinutes } from "@/lib/money";
 import { calculateLoggedHours } from "@/lib/money";
 
 /**
+ * Retrieves student's currently active (OPEN) time log, if any.
+ */
+export async function getActiveTimeLog(studentId: string): Promise<FormattedTimeLog | null> {
+  const activeRaw = await prisma.timeLog.findFirst({
+    where: { studentId, status: TimeLogStatus.OPEN },
+    include: { task: { select: { title: true } } },
+  });
+
+  if (!activeRaw) return null;
+
+  return {
+    id: activeRaw.id,
+    studentId: activeRaw.studentId,
+    taskId: activeRaw.taskId,
+    taskTitle: activeRaw.task.title,
+    timeIn: activeRaw.timeIn,
+    timeOut: activeRaw.timeOut,
+    totalHours: activeRaw.totalHours,
+    status: activeRaw.status,
+    correctionNote: activeRaw.correctionNote,
+    requestedTimeOut: activeRaw.requestedTimeOut,
+    correctionStatus: activeRaw.correctionStatus,
+    disputeReason: activeRaw.disputeReason,
+    disputeResponse: activeRaw.disputeResponse,
+    createdAt: activeRaw.createdAt,
+  };
+}
+
+/**
  * Retrieves student's active timer, historical logs, task picker options, and stats.
  */
 export async function getStudentTimeData(studentId: string): Promise<StudentTimeTrackingData> {
-  const [activeRaw, logsRaw, availableTasks, link] = await Promise.all([
-    prisma.timeLog.findFirst({
-      where: { studentId, status: TimeLogStatus.OPEN },
-      include: { task: { select: { title: true } } },
-    }),
+  const [activeLog, logsRaw, availableTasks, link] = await Promise.all([
+    getActiveTimeLog(studentId),
     prisma.timeLog.findMany({
       where: { studentId },
       include: { task: { select: { title: true } } },
@@ -63,25 +90,6 @@ export async function getStudentTimeData(studentId: string): Promise<StudentTime
       select: { hourlyRate: true },
     }),
   ]);
-
-  const activeLog: FormattedTimeLog | null = activeRaw
-    ? {
-      id: activeRaw.id,
-      studentId: activeRaw.studentId,
-      taskId: activeRaw.taskId,
-      taskTitle: activeRaw.task.title,
-      timeIn: activeRaw.timeIn,
-      timeOut: activeRaw.timeOut,
-      totalHours: activeRaw.totalHours,
-      status: activeRaw.status,
-      correctionNote: activeRaw.correctionNote,
-      requestedTimeOut: activeRaw.requestedTimeOut,
-      correctionStatus: activeRaw.correctionStatus,
-      disputeReason: activeRaw.disputeReason,
-      disputeResponse: activeRaw.disputeResponse,
-      createdAt: activeRaw.createdAt,
-    }
-    : null;
 
   const logs: FormattedTimeLog[] = logsRaw.map((l) => ({
     id: l.id,
@@ -145,7 +153,7 @@ export async function getStudentTimeData(studentId: string): Promise<StudentTime
  */
 export async function timeIn(studentId: string, taskId: string) {
   try {
-    return await prisma.$transaction(
+    const result = await prisma.$transaction(
       async (tx) => {
         const openCount = await tx.timeLog.count({
           where: { studentId, status: TimeLogStatus.OPEN },
@@ -183,11 +191,19 @@ export async function timeIn(studentId: string, taskId: string) {
             timeIn: new Date(),
             status: TimeLogStatus.OPEN,
           },
-          include: { task: { select: { title: true } } },
+          include: { task: { select: { title: true, clientId: true } } },
         });
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+
+    if (result?.task?.clientId) {
+      publishLiveUpdate([studentId, result.task.clientId], "time");
+      publishLiveUpdate([studentId, result.task.clientId], "timesheets");
+      publishLiveUpdate([studentId, result.task.clientId], "tasks");
+    }
+
+    return result;
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
       throw new Error("Another time log was started at the same time. Please try again.");
@@ -204,7 +220,7 @@ export async function timeOut(
   timeLogId: string,
   notes?: string
 ) {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const activeLog = await tx.timeLog.findUnique({
       where: { id: timeLogId },
       include: {
@@ -253,9 +269,16 @@ export async function timeOut(
 
     return await tx.timeLog.findUniqueOrThrow({
       where: { id: timeLogId },
-      include: { task: { select: { title: true } } },
+      include: { task: { select: { title: true, clientId: true } } },
     });
   });
+
+  if (result?.task?.clientId) {
+    publishLiveUpdate([studentId, result.task.clientId], "time");
+    publishLiveUpdate([studentId, result.task.clientId], "timesheets");
+  }
+
+  return result;
 }
 
 /**
@@ -265,7 +288,7 @@ export async function requestCorrection(
   studentId: string,
   input: CorrectionRequestInput
 ) {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const log = await tx.timeLog.findUnique({
       where: { id: input.timeLogId },
       include: {
@@ -321,6 +344,16 @@ export async function requestCorrection(
       message: `${studentName} requested a time correction on ${log.task.title}`,
     });
 
-    return await tx.timeLog.findUniqueOrThrow({ where: { id: input.timeLogId } });
+    return await tx.timeLog.findUniqueOrThrow({
+      where: { id: input.timeLogId },
+      include: { task: { select: { clientId: true } } },
+    });
   });
+
+  if (result?.task?.clientId) {
+    publishLiveUpdate([studentId, result.task.clientId], "time");
+    publishLiveUpdate([studentId, result.task.clientId], "timesheets");
+  }
+
+  return result;
 }

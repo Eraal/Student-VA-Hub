@@ -1,6 +1,7 @@
 import { prisma } from "../prisma";
 import { InvoiceStatus, TimeLogStatus, CorrectionStatus } from "@prisma/client";
 import { createNotification } from "../notifications";
+import { publishLiveUpdate } from "../live-updates";
 import {
   calculateLoggedHours,
   calculateLogAmount,
@@ -297,6 +298,9 @@ export async function approveTimeLog(clientId: string, timeLogId: string) {
     return { approvedLog, invoice };
   });
 
+  publishLiveUpdate([clientId, studentId], "timesheets");
+  publishLiveUpdate([clientId, studentId], "earnings");
+
   return result;
 }
 
@@ -304,7 +308,7 @@ export async function approveTimeLog(clientId: string, timeLogId: string) {
  * Disputes a time log with a reason in one transaction.
  */
 export async function disputeTimeLog(clientId: string, timeLogId: string, disputeReason: string) {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const log = await tx.timeLog.findUnique({
       where: { id: timeLogId },
       include: {
@@ -355,6 +359,20 @@ export async function disputeTimeLog(clientId: string, timeLogId: string, disput
 
     return await tx.timeLog.findUniqueOrThrow({ where: { id: timeLogId } });
   });
+
+  if (result) {
+    // Look up the log to find the counterpart studentId
+    const log = await prisma.timeLog.findUnique({
+      where: { id: timeLogId },
+      select: { studentId: true },
+    });
+    if (log) {
+      publishLiveUpdate([clientId, log.studentId], "timesheets");
+      publishLiveUpdate([clientId, log.studentId], "earnings");
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -365,7 +383,7 @@ export async function respondToCorrection(
   timeLogId: string,
   decision: "APPROVE" | "REJECT"
 ) {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const log = await tx.timeLog.findUnique({
       where: { id: timeLogId },
       include: {
@@ -431,16 +449,29 @@ export async function respondToCorrection(
         message: `${clientName} declined your time correction on ${log.task.title}`,
       });
 
-      return await tx.timeLog.findUniqueOrThrow({ where: { id: timeLogId } });
+      return await tx.timeLog.findUniqueOrThrow({
+        where: { id: timeLogId },
+        include: { task: { select: { studentId: true } } },
+      });
     }
   });
+
+  if (result) {
+    const studentId = (result as any).task?.studentId ?? (result as any).studentId;
+    if (studentId) {
+      publishLiveUpdate([clientId, studentId], "time");
+      publishLiveUpdate([clientId, studentId], "timesheets");
+    }
+  }
+
+  return result;
 }
 
 /**
  * Marks an invoice as PAID in one transaction (Acceptance Test Scenario 11).
  */
 export async function markInvoicePaid(clientId: string, invoiceId: string) {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const invoice = await tx.invoice.findUnique({
       where: { id: invoiceId },
     });
@@ -477,6 +508,13 @@ export async function markInvoicePaid(clientId: string, invoiceId: string) {
 
     return await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
   });
+
+  if (result) {
+    publishLiveUpdate([clientId, result.studentId], "timesheets");
+    publishLiveUpdate([clientId, result.studentId], "earnings");
+  }
+
+  return result;
 }
 
 /**

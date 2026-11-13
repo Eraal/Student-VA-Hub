@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { generateInviteCode } from "@/lib/invite-code";
 import { LinkStatus, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { publishLiveUpdate } from "../live-updates";
 import {
   UpdateStudentProfileInput,
   UpdateClientProfileInput,
@@ -165,6 +166,8 @@ export async function linkStudentToClient(
       });
     });
 
+    publishLiveUpdate([clientId, invite.studentId], "link");
+
     return {
       success: true,
       data: {
@@ -265,6 +268,8 @@ export async function updateClientHourlyRate(
     where: { id: link.id },
     data: { hourlyRate },
   });
+
+  publishLiveUpdate([clientId, link.studentId], "link");
 
   return {
     success: true,

@@ -5,6 +5,7 @@ import {
   timeOut,
   requestCorrection,
   getStudentTimeData,
+  getActiveTimeLog,
 } from "./time-service";
 import { calculateLogAmount } from "../money";
 import { prisma } from "../prisma";
@@ -289,6 +290,23 @@ describe("time-service", () => {
       const afterData = await getStudentTimeData(studentId);
       expect(afterData.activeLog).toBeNull();
       expect(afterData.logs.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("getActiveTimeLog returns open log when active, null when stopped", async () => {
+      const before = await getActiveTimeLog(studentId);
+      expect(before).toBeNull();
+
+      const log = await timeIn(studentId, testTaskId);
+      const active = await getActiveTimeLog(studentId);
+      expect(active).not.toBeNull();
+      expect(active?.id).toBe(log.id);
+      expect(active?.taskId).toBe(testTaskId);
+      expect(active?.taskTitle).toBe("Test Task for Timing");
+      expect(active?.status).toBe(TimeLogStatus.OPEN);
+
+      await timeOut(studentId, log.id);
+      const after = await getActiveTimeLog(studentId);
+      expect(after).toBeNull();
     });
   });
 });

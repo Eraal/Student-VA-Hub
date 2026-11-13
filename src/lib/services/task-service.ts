@@ -2,6 +2,7 @@ import { prisma } from "../prisma";
 import { TaskStatus, StudentResponse } from "@prisma/client";
 import { checkConflict, ConflictCheckResult } from "../conflict";
 import { createNotification } from "../notifications";
+import { publishLiveUpdate } from "../live-updates";
 import type {
   CreateTaskInput,
   CheckTaskConflictInput,
@@ -214,6 +215,8 @@ export async function createTask(clientId: string, input: CreateTaskInput) {
     return created;
   });
 
+  publishLiveUpdate([clientId, studentId], "tasks");
+
   return {
     task: result,
     hasWarnings: conflictCheck.hasWarnings,
@@ -363,6 +366,8 @@ export async function updateTaskStatus(
     data: { status: newStatus },
   });
 
+  publishLiveUpdate([task.clientId, task.studentId], "tasks");
+
   return updated;
 }
 
@@ -375,7 +380,7 @@ export async function respondToTask(
   response: StudentResponse,
   rescheduleReason?: string
 ) {
-  return await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const task = await tx.task.findUnique({
       where: { id: taskId },
       include: {
@@ -444,5 +449,9 @@ export async function respondToTask(
 
     return await tx.task.findUniqueOrThrow({ where: { id: taskId } });
   });
+
+  publishLiveUpdate([result.clientId, result.studentId], "tasks");
+
+  return result;
 }
 

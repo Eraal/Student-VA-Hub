@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Role, Prisma } from "@prisma/client";
+import { publishLiveUpdate } from "./live-updates";
 import type { Tone } from "./labels";
 export type { Tone };
 import {
@@ -191,12 +192,16 @@ export async function createNotification(
     throw new Error("createNotification must be called with a transaction client, not the global prisma instance.");
   }
 
-  return tx.notification.create({
+  const notification = await tx.notification.create({
     data: {
       userId: params.recipientId,
       type: params.type,
       message: params.message,
     },
   });
+
+  publishLiveUpdate([params.recipientId], "notifications");
+
+  return notification;
 }
 

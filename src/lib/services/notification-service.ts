@@ -1,4 +1,5 @@
 import { prisma } from "../prisma";
+import { publishLiveUpdate } from "../live-updates";
 
 export interface NotificationItem {
   id: string;
@@ -55,6 +56,8 @@ export async function markNotificationAsRead(userId: string, notificationId: str
     data: { readAt: new Date() },
   });
 
+  publishLiveUpdate([userId], "notifications");
+
   return true;
 }
 
@@ -66,6 +69,8 @@ export async function markAllNotificationsAsRead(userId: string): Promise<number
     where: { userId, readAt: null },
     data: { readAt: new Date() },
   });
+
+  publishLiveUpdate([userId], "notifications");
 
   return result.count;
 }

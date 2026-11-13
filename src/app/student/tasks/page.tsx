@@ -2,13 +2,22 @@ import * as React from "react";
 import { requireRolePage } from "@/lib/auth-helpers";
 import { Role } from "@prisma/client";
 import { getStudentTasks } from "@/lib/services/task-service";
+import { getActiveTimeLog } from "@/lib/services/time-service";
 import { StudentTasksView } from "@/components/student/tasks/student-tasks-view";
 
 async function StudentTasksContent() {
   const user = await requireRolePage(Role.STUDENT);
-  const tasks = await getStudentTasks(user.id);
+  const [tasks, activeLog] = await Promise.all([
+    getStudentTasks(user.id),
+    getActiveTimeLog(user.id),
+  ]);
 
-  return <StudentTasksView initialTasks={tasks} />;
+  return (
+    <StudentTasksView
+      initialTasks={tasks}
+      initialActiveLog={activeLog}
+    />
+  );
 }
 
 export default function StudentTasksPage() {

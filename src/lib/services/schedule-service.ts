@@ -1,4 +1,5 @@
 import { prisma } from "../prisma";
+import { publishToUserAndCounterpart } from "../live-updates";
 import {
   minutesToTimeString,
   minutesToDurationString,
@@ -188,6 +189,8 @@ export async function addClassSchedule(studentId: string, input: ClassScheduleIn
     },
   });
 
+  await publishToUserAndCounterpart(studentId, "schedule");
+
   return {
     classItem: created,
     warning: overlapWarning,
@@ -226,6 +229,8 @@ export async function updateClassSchedule(studentId: string, input: ClassSchedul
     },
   });
 
+  await publishToUserAndCounterpart(studentId, "schedule");
+
   return {
     classItem: updated,
     warning: overlapWarning,
@@ -248,6 +253,8 @@ export async function deleteClassSchedule(studentId: string, classId: string) {
     where: { id: classId },
   });
 
+  await publishToUserAndCounterpart(studentId, "schedule");
+
   return { success: true };
 }
 
@@ -266,6 +273,8 @@ export async function addAvailability(studentId: string, input: AvailabilityInpu
       endMinutes,
     },
   });
+
+  await publishToUserAndCounterpart(studentId, "schedule");
 
   return created;
 }
@@ -286,6 +295,8 @@ export async function deleteAvailability(studentId: string, availabilityId: stri
     where: { id: availabilityId },
   });
 
+  await publishToUserAndCounterpart(studentId, "schedule");
+
   return { success: true };
 }
 
@@ -304,6 +315,8 @@ export async function updateMaxHours(studentId: string, maxHours: number) {
       maxHoursPerDay: maxHours,
     },
   });
+
+  await publishToUserAndCounterpart(studentId, "schedule");
 
   return updated;
 }
@@ -324,6 +337,8 @@ export async function addBlockedDate(studentId: string, input: BlockedDateInput)
     },
   });
 
+  await publishToUserAndCounterpart(studentId, "schedule");
+
   return created;
 }
 
@@ -342,6 +357,8 @@ export async function deleteBlockedDate(studentId: string, blockedDateId: string
   await prisma.blockedDate.delete({
     where: { id: blockedDateId },
   });
+
+  await publishToUserAndCounterpart(studentId, "schedule");
 
   return { success: true };
 }
