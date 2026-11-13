@@ -5,66 +5,110 @@
 
 /* ==========================================================================
    Student VA-Hub — Design Tokens (Tailwind v4, CSS-only config)
-   See docs/DESIGN.md for the full rules.
+   Visual Source of Truth: Landing Page Redesign
+   See docs/DESIGN.md for the full specification.
 
-   Usage meanings (enforced by convention):
-     --color-class    → blue-600   — class schedule blocks ONLY
-     --color-work     → green-600  — VA work / task blocks ONLY
-     --color-conflict → red-600    — conflict alerts ONLY
-     --color-accent   → zinc-900   — primary buttons, active nav, links
+   Golden Rule:
+     Blue   = class    (#2563EB) — class schedule blocks ONLY
+     Green  = VA work  (#16A34A) — VA work / task blocks ONLY
+     Red    = conflict (#DC2626) — conflict alerts / hard blocks ONLY
+     Amber  = warning  (#D97706) — 4h burnout cap / alerts ONLY
+     Used ONLY for their meaning.
 
-   Avoid: gradients, glassmorphism, glow, emoji icons, oversized radius.
+   App pages are denser and calmer than the landing page, but must look like
+   the same product. If a new page looks different from the landing page, it is wrong.
    ========================================================================== */
 
 @theme inline {
   /* Fonts */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-bricolage);
 
-  /* Base palette */
-  --color-bg: #ffffff;
-  --color-surface: #f9fafb;
-  /* gray-50  — card / panel background  */
-  --color-border: #e5e7eb;
-  /* gray-200 — borders                   */
-  --color-text: #111827;
-  /* gray-900 — primary text              */
-  --color-muted: #6b7280;
-  /* gray-500 — secondary / placeholder   */
+  /* Base palette — extracted directly from landing page */
+  --color-bg: #FAF7F2;
+  /* warm cream / paper canvas            */
+  --color-surface: #ffffff;
+  /* crisp white card & panel background  */
+  --color-surface-subtle: #FAF7F2;
+  /* soft warm tint for secondary panels  */
+  --color-border: #0F172A;
+  /* deep slate-900 — structural borders  */
+  --color-border-subtle: #E5DFD5;
+  /* warm taupe — dividers & inner borders */
+  --color-text: #0F172A;
+  /* deep slate-900 — primary text        */
+  --color-muted: #64748B;
+  /* slate-500 — secondary / placeholder  */
+  --color-muted-darker: #475569;
+  /* slate-600 — paragraph copy          */
 
-  /* Accent (near-black, neutral) */
-  --color-accent: #18181b;
-  /* zinc-900 — buttons, links, active nav */
-  --color-accent-hover: #3f3f46;
-  /* zinc-700 — hover state               */
+  /* Accent / Primary (Deep Slate-900) */
+  --color-accent: #0F172A;
+  /* primary buttons, badges, key labels  */
+  --color-accent-hover: #1E293B;
+  /* slate-800 hover state                */
   --color-accent-fg: #ffffff;
   /* text on top of accent                */
 
   /* Meaning colors — use ONLY for their designated purpose */
-  --color-class: #2563eb;
-  /* blue-600  — class blocks              */
-  --color-class-bg: #eff6ff;
-  /* blue-50   — class block background    */
-  --color-work: #16a34a;
-  /* green-600 — VA work / task blocks     */
-  --color-work-bg: #f0fdf4;
-  /* green-50  — work block background     */
-  --color-conflict: #dc2626;
-  /* red-600   — conflict alerts           */
-  --color-conflict-bg: #fef2f2;
-  /* red-50    — conflict background       */
+  --color-class: #2563EB;
+  /* blue-600  — class schedule blocks    */
+  --color-class-bg: #EFF6FF;
+  /* blue-50   — class block background   */
+  --color-class-fg: #1E40AF;
+  /* blue-800  — class block text         */
+  --color-class-border: #2563EB;
+  /* blue border                          */
 
-  /* Shape */
-  --radius: 8px;
-  /* rounded-md — no xl or larger */
-  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  /* shadow-sm */
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
+  --color-work: #16A34A;
+  /* green-600 — VA work / task blocks    */
+  --color-work-bg: #F0FDF4;
+  /* green-50  — work block background    */
+  --color-work-fg: #166534;
+  /* green-800 — work block text          */
+  --color-work-border: #16A34A;
+  /* green border                         */
 
-  /* shadcn color aliases */
+  --color-conflict: #DC2626;
+  /* red-600   — conflict alerts / blocks */
+  --color-conflict-bg: #FEF2F2;
+  /* red-50    — conflict background      */
+  --color-conflict-fg: #991B1B;
+  /* red-800   — conflict text            */
+  --color-conflict-border: #DC2626;
+  /* red border                           */
+
+  --color-warning: #D97706;
+  /* amber-600 — 4h burnout warnings      */
+  --color-warning-bg: #FFFBEB;
+  /* amber-50  — warning background       */
+  --color-warning-fg: #92400E;
+  /* amber-800 — warning text             */
+  --color-warning-border: #D97706;
+  /* amber border                         */
+
+  /* Shape & Radius */
+  --radius: 12px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+
+  /* Hard offset shadows (Neo-brutalist / Warm Editorial) */
+  --shadow-hard-xs: 1px 1px 0px 0px #0F172A;
+  --shadow-hard-sm: 1.5px 1.5px 0px 0px #0F172A;
+  --shadow-hard: 2px 2px 0px 0px #0F172A;
+  --shadow-hard-md: 3px 3px 0px 0px #0F172A;
+  --shadow-hard-lg: 4px 4px 0px 0px #0F172A;
+  --shadow-hard-xl: 5px 5px 0px 0px #0F172A;
+
+  /*
+   * shadcn aliases intentionally use distinct names here. Do not redeclare
+   * design tokens such as --color-muted, --color-accent, or --color-border:
+   * those names are consumed directly by the application.
+   */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -75,13 +119,10 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
@@ -99,20 +140,21 @@
    ------------------------------------------------------------------------- */
 
 :root {
-  --radius: 8px;
+  --header-h: 4rem;
+  --radius: 12px;
   --background: var(--color-bg);
   --foreground: var(--color-text);
   --card: var(--color-surface);
   --card-foreground: var(--color-text);
-  --popover: var(--color-bg);
+  --popover: var(--color-surface);
   --popover-foreground: var(--color-text);
   --primary: var(--color-accent);
   --primary-foreground: var(--color-accent-fg);
-  --secondary: var(--color-surface);
+  --secondary: var(--color-surface-subtle);
   --secondary-foreground: var(--color-text);
-  --muted: var(--color-surface);
+  --muted: var(--color-surface-subtle);
   --muted-foreground: var(--color-muted);
-  --accent: var(--color-surface);
+  --accent: var(--color-surface-subtle);
   --accent-foreground: var(--color-text);
   --destructive: var(--color-conflict);
   --destructive-foreground: #ffffff;
@@ -120,46 +162,60 @@
   --input: var(--color-border);
   --ring: var(--color-accent);
 
+  /* Meaning tokens for direct consumption */
+  --class: var(--color-class);
+  --class-bg: var(--color-class-bg);
+  --class-foreground: var(--color-class-fg);
+  --work: var(--color-work);
+  --work-bg: var(--color-work-bg);
+  --work-foreground: var(--color-work-fg);
+  --conflict: var(--color-conflict);
+  --conflict-bg: var(--color-conflict-bg);
+  --conflict-foreground: var(--color-conflict-fg);
+  --warning: var(--color-warning);
+  --warning-bg: var(--color-warning-bg);
+  --warning-foreground: var(--color-warning-fg);
+
   /* Sidebar */
   --sidebar: var(--color-surface);
   --sidebar-foreground: var(--color-text);
   --sidebar-primary: var(--color-accent);
   --sidebar-primary-foreground: var(--color-accent-fg);
-  --sidebar-accent: var(--color-border);
+  --sidebar-accent: var(--color-surface-subtle);
   --sidebar-accent-foreground: var(--color-text);
-  --sidebar-border: var(--color-border);
+  --sidebar-border: var(--color-border-subtle);
   --sidebar-ring: var(--color-accent);
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #f4f4f5;
-  --card: #18181b;
-  --card-foreground: #f4f4f5;
-  --popover: #18181b;
-  --popover-foreground: #f4f4f5;
-  --primary: #f4f4f5;
-  --primary-foreground: #18181b;
-  --secondary: #27272a;
-  --secondary-foreground: #f4f4f5;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --accent: #27272a;
-  --accent-foreground: #f4f4f5;
-  --destructive: #7f1d1d;
-  --destructive-foreground: #f4f4f5;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #d4d4d8;
+  --background: #0F172A;
+  --foreground: #F8FAFC;
+  --card: #1E293B;
+  --card-foreground: #F8FAFC;
+  --popover: #1E293B;
+  --popover-foreground: #F8FAFC;
+  --primary: #F8FAFC;
+  --primary-foreground: #0F172A;
+  --secondary: #1E293B;
+  --secondary-foreground: #F8FAFC;
+  --muted: #334155;
+  --muted-foreground: #94A3B8;
+  --accent: #334155;
+  --accent-foreground: #F8FAFC;
+  --destructive: #EF4444;
+  --destructive-foreground: #ffffff;
+  --border: #475569;
+  --input: #475569;
+  --ring: #94A3B8;
 
-  --sidebar: #18181b;
-  --sidebar-foreground: #f4f4f5;
-  --sidebar-primary: #f4f4f5;
-  --sidebar-primary-foreground: #18181b;
-  --sidebar-accent: #27272a;
-  --sidebar-accent-foreground: #f4f4f5;
-  --sidebar-border: #27272a;
-  --sidebar-ring: #d4d4d8;
+  --sidebar: #1E293B;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #F8FAFC;
+  --sidebar-primary-foreground: #0F172A;
+  --sidebar-accent: #334155;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #334155;
+  --sidebar-ring: #94A3B8;
 }
 
 /* -------------------------------------------------------------------------
@@ -171,17 +227,12 @@
     @apply border-border outline-ring/50;
   }
 
+  html,
   body {
     @apply bg-background text-foreground;
+    overflow-x: clip;
   }
 }
-
-/* Accessible focus ring matching accent */
-*:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
 
 /* Accessible focus ring matching accent */
 *:focus-visible {

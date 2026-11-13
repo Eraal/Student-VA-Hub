@@ -2,11 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { GraduationCap, ArrowLeft, Mail, CheckCircle2, Loader2 } from "lucide-react";
+import { Mail, CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
+import { displayFontClass } from "@/components/landing/fonts";
+import { AuthLayout } from "@/components/auth/auth-layout";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = React.useState("");
@@ -17,7 +15,7 @@ export default function ForgotPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !email.includes("@")) {
-      setError("Mangyaring maglagay ng wastong email address.");
+      setError("Please enter a valid email address.");
       return;
     }
 
@@ -32,105 +30,97 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] flex flex-col justify-center items-center px-4 py-12">
-      <div className="w-full max-w-sm space-y-6">
-        {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex size-10 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)] shadow-xs">
-            <GraduationCap className="size-5" />
-          </div>
-          <h1 className="text-lg font-bold tracking-tight text-[var(--color-text)]">
-            Student VA-Hub
+    <AuthLayout mode="forgot-password">
+      <div className="w-full space-y-6">
+        <div>
+          <h1 className={`${displayFontClass} text-xl font-semibold tracking-tight text-[#0F172A]`}>
+            {isSubmitted ? "Check your email" : "Reset your password"}
           </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            {isSubmitted
+              ? `We have sent password reset instructions to ${email}.`
+              : "Enter your email address and we'll send you reset instructions."}
+          </p>
         </div>
 
-        <Card className="border-[var(--color-border)] bg-[var(--color-surface)] shadow-xs">
-          <CardHeader className="pb-3 text-center">
-            <CardTitle className="text-base font-semibold text-[var(--color-text)]">
-              {isSubmitted ? "Tingnan ang iyong Email" : "Nakalimutan ang Password?"}
-            </CardTitle>
-            <CardDescription className="text-xs text-[var(--color-muted)]">
-              {isSubmitted
-                ? `Nagpadala kami ng password reset link sa ${email}.`
-                : "Ilagay ang iyong email address upang makatanggap ng instructions para i-reset ang iyong password."}
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-4 pt-1">
-            {isSubmitted ? (
-              <div className="space-y-4 text-center">
-                <div className="flex size-12 mx-auto items-center justify-center rounded-full bg-[var(--color-work-bg)] text-[var(--color-work)]">
-                  <CheckCircle2 className="size-6" />
-                </div>
-                <p className="text-xs text-[var(--color-muted)]">
-                  Kung may account na nakarehistro gamit ang email na ito, makakatanggap ka ng email sa loob ng ilang minuto.
-                </p>
-                <Link href="/login" className="block w-full">
-                  <Button variant="outline" size="sm" className="w-full text-xs cursor-pointer">
-                    Bumalik sa Login
-                  </Button>
-                </Link>
+        {isSubmitted ? (
+          <div className="space-y-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F0FDF4] text-[#16A34A]">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              If an account exists for that email, a reset link will be sent when email sending is enabled.
+            </p>
+            <Link
+              href="/login"
+              className="w-full h-9 rounded-md border border-[#E5DFD5] bg-white hover:bg-[#FAF7F2] text-[#0F172A] text-xs font-medium shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+              <span>Back to log in</span>
+            </Link>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            {error && (
+              <div
+                role="alert"
+                className="flex items-center gap-2 rounded-md border border-[#DC2626]/30 bg-[#FEF2F2] p-2.5 text-xs text-[#991B1B] font-medium"
+              >
+                <span>{error}</span>
               </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
-                  <div className="p-2.5 rounded-md border border-[var(--color-conflict)]/40 bg-[var(--color-conflict-bg)] text-xs text-[var(--color-conflict)]">
-                    {error}
-                  </div>
-                )}
-
-                <div className="space-y-1.5 text-left">
-                  <Label htmlFor="email" className="text-xs font-medium text-[var(--color-text)]">
-                    Email address
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="pangalan@halimbawa.com"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        setError(null);
-                      }}
-                      className="pl-8 text-xs h-9 bg-[var(--color-bg)]"
-                      required
-                    />
-                    <Mail className="size-3.5 absolute left-2.5 top-3 text-[var(--color-muted)]" />
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={isLoading}
-                  className="w-full text-xs h-9 cursor-pointer bg-[var(--color-accent)] text-[var(--color-accent-fg)] hover:opacity-90"
-                >
-                  {isLoading ? (
-                    <span className="flex items-center gap-1.5">
-                      <Loader2 className="size-3.5 animate-spin" />
-                      <span>Nagpapadala...</span>
-                    </span>
-                  ) : (
-                    "Ipadala ang Reset Link"
-                  )}
-                </Button>
-
-                <div className="text-center pt-1">
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center gap-1 text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
-                  >
-                    <ArrowLeft className="size-3" />
-                    <span>Bumalik sa Login</span>
-                  </Link>
-                </div>
-              </form>
             )}
-          </CardContent>
-        </Card>
+
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-xs font-medium text-slate-700 mb-1.5"
+              >
+                Email address
+              </label>
+              <div className="relative">
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError(null);
+                  }}
+                  required
+                  className="h-9 w-full rounded-md border border-[#E5DFD5] bg-white pl-9 pr-3 py-1.5 text-sm text-[#0F172A] shadow-2xs transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#0F172A] focus-visible:border-[#0F172A] disabled:opacity-50"
+                />
+                <Mail className="h-4 w-4 absolute left-3 top-2.5 text-slate-400" />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-9 rounded-md bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs font-medium shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                  <span>Sending instructions...</span>
+                </>
+              ) : (
+                <span>Send reset link</span>
+              )}
+            </button>
+
+            <p className="text-center text-xs text-slate-500 pt-1">
+              Remember your password?{" "}
+              <Link
+                href="/login"
+                className="font-medium text-[#0F172A] underline underline-offset-4 hover:text-slate-700 transition-colors"
+              >
+                Log in
+              </Link>
+            </p>
+          </form>
+        )}
       </div>
-    </div>
+    </AuthLayout>
   );
 }
-

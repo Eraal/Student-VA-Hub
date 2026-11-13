@@ -13,6 +13,7 @@ import {
   timeOut,
   requestCorrection,
 } from "@/lib/services/time-service";
+import { toUserErrorMessage, formatZodFieldErrors } from "@/lib/errors";
 import type { ActionResult } from "./profile";
 
 /**
@@ -42,8 +43,7 @@ export async function timeInAction(
 
     return { success: true, data: { id: created.id } };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to Time In.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -81,8 +81,7 @@ export async function timeOutAction(
       data: { id: updated.id, totalHours: updated.totalHours ?? 0 },
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to Time Out.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -97,14 +96,11 @@ export async function requestCorrectionAction(
 
   const parsed = correctionRequestSchema.safeParse(rawData);
   if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0];
-      if (field && typeof field === "string" && !fieldErrors[field]) {
-        fieldErrors[field] = issue.message;
-      }
-    }
-    return { success: false, error: "Please fix correction errors.", fieldErrors };
+    return {
+      success: false,
+      error: "Please fix correction errors.",
+      fieldErrors: formatZodFieldErrors(parsed.error),
+    };
   }
 
   try {
@@ -114,8 +110,7 @@ export async function requestCorrectionAction(
 
     return { success: true, data: { id: updated.id } };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to request correction.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 

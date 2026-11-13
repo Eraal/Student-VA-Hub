@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { StudentScheduleData } from "@/lib/services/schedule-service";
 import { ClassesTab } from "./classes-tab";
 import { AvailabilityTab } from "./availability-tab";
-import { CalendarDays, Clock, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
+import { CalendarDays, ShieldCheck, Plus } from "lucide-react";
 
 interface ScheduleViewProps {
   initialData: StudentScheduleData;
@@ -14,6 +17,15 @@ interface ScheduleViewProps {
 export function ScheduleView({ initialData }: ScheduleViewProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<"classes" | "availability">("classes");
+  const [isAddClassOpen, setIsAddClassOpen] = React.useState(false);
+  const [prefillAddClass, setPrefillAddClass] = React.useState<
+    { dayOfWeek?: number; startTime?: string } | undefined
+  >(undefined);
+
+  const [isAddWindowOpen, setIsAddWindowOpen] = React.useState(false);
+  const [prefillAddWindow, setPrefillAddWindow] = React.useState<
+    { dayOfWeek?: number; startTime?: string } | undefined
+  >(undefined);
 
   const handleRefresh = () => {
     router.refresh();
@@ -22,83 +34,94 @@ export function ScheduleView({ initialData }: ScheduleViewProps) {
   const totalClasses = initialData.classes.length;
   const totalWindows = initialData.availabilities.length;
 
+  const handleHeaderAddClass = () => {
+    setActiveTab("classes");
+    setPrefillAddClass(undefined);
+    setIsAddClassOpen(true);
+  };
+
+  const handleHeaderAddWindow = () => {
+    setActiveTab("availability");
+    setPrefillAddWindow(undefined);
+    setIsAddWindowOpen(true);
+  };
+
   return (
-    <div className="space-y-6">
+    <PageContainer>
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div className="space-y-1">
-          <h1 className="text-xl font-bold tracking-tight text-[var(--color-text)]">
-            Class Schedule & Availability
-          </h1>
-          <p className="text-xs text-[var(--color-muted)]">
-            Your class schedule is the source of truth. Manage classes and free-time windows.
-          </p>
-        </div>
+      <PageHeader
+        title="Schedule"
+        subtitle="Your classes are blocked off, so clients can't assign tasks during them."
+        actions={
+          activeTab === "classes" ? (
+            <Button
+              type="button"
+              data-testid="schedule-add-class"
+              onClick={handleHeaderAddClass}
+              className="bg-[#0F172A] text-white font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-slate-800 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#0F172A] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none min-h-[40px] px-4 rounded-lg text-xs gap-1.5 cursor-pointer"
+            >
+              <Plus className="size-4" />
+              <span>Add class</span>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              data-testid="availability-add-window"
+              onClick={handleHeaderAddWindow}
+              className="bg-[#0F172A] text-white font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-slate-800 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#0F172A] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none min-h-[40px] px-4 rounded-lg text-xs gap-1.5 cursor-pointer"
+            >
+              <Plus className="size-4" />
+              <span>Add free window</span>
+            </Button>
+          )
+        }
+      />
 
-        {/* Legend / Status badges */}
-        <div className="flex flex-wrap items-center gap-2 text-[11px]">
-          <span className="flex items-center gap-1 rounded bg-[var(--color-class-bg)] text-[var(--color-class)] px-2 py-0.5 font-medium border border-blue-200">
-            <span className="size-1.5 rounded-full bg-[var(--color-class)]" />
-            <span>Class (Hard Block)</span>
-          </span>
-          <span className="flex items-center gap-1 rounded bg-[var(--color-work-bg)] text-[var(--color-work)] px-2 py-0.5 font-medium border border-green-200">
-            <span className="size-1.5 rounded-full bg-[var(--color-work)]" />
-            <span>VA Window</span>
-          </span>
-          <span className="flex items-center gap-1 rounded bg-[var(--color-surface)] text-[var(--color-muted)] px-2 py-0.5 border border-[var(--color-border)]">
-            <Clock className="size-3" />
-            <span>UTC+8 (Manila)</span>
-          </span>
-        </div>
-      </div>
-
-      {/* Tabs navigation */}
-      <div className="border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-6">
-          <button
-            type="button"
-            onClick={() => setActiveTab("classes")}
-            className={`flex items-center gap-2 pb-3 text-xs font-semibold transition-colors cursor-pointer border-b-2 -mb-px ${
+      {/* Tabs navigation: Classes & Availability */}
+      <div className="flex items-center gap-1.5 rounded-xl border-[1.5px] border-[#0F172A] bg-[#FAF7F2] p-1 shadow-[2px_2px_0px_0px_#0F172A] w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab("classes")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "classes"
+              ? "bg-[#0F172A] text-white shadow-[1px_1px_0px_0px_#0F172A]"
+              : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
+          }`}
+        >
+          <CalendarDays className="size-3.5" />
+          <span>Classes</span>
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
               activeTab === "classes"
-                ? "border-[var(--color-accent)] text-[var(--color-text)]"
-                : "border-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]"
+                ? "bg-white/20 text-white"
+                : "bg-white border border-[#0F172A]/20 text-slate-700"
             }`}
           >
-            <CalendarDays className="size-3.5" />
-            <span>Classes</span>
-            <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                activeTab === "classes"
-                  ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)]"
-                  : "bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)]"
-              }`}
-            >
-              {totalClasses}
-            </span>
-          </button>
+            {totalClasses}
+          </span>
+        </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("availability")}
-            className={`flex items-center gap-2 pb-3 text-xs font-semibold transition-colors cursor-pointer border-b-2 -mb-px ${
+        <button
+          type="button"
+          onClick={() => setActiveTab("availability")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "availability"
+              ? "bg-[#0F172A] text-white shadow-[1px_1px_0px_0px_#0F172A]"
+              : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
+          }`}
+        >
+          <ShieldCheck className="size-3.5" />
+          <span>Availability</span>
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
               activeTab === "availability"
-                ? "border-[var(--color-accent)] text-[var(--color-text)]"
-                : "border-transparent text-[var(--color-muted)] hover:text-[var(--color-text)]"
+                ? "bg-white/20 text-white"
+                : "bg-white border border-[#0F172A]/20 text-slate-700"
             }`}
           >
-            <ShieldCheck className="size-3.5" />
-            <span>Availability & Capacity</span>
-            <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                activeTab === "availability"
-                  ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)]"
-                  : "bg-[var(--color-surface)] text-[var(--color-muted)] border border-[var(--color-border)]"
-              }`}
-            >
-              {totalWindows}
-            </span>
-          </button>
-        </div>
+            {totalWindows}
+          </span>
+        </button>
       </div>
 
       {/* Tab Panels */}
@@ -106,16 +129,24 @@ export function ScheduleView({ initialData }: ScheduleViewProps) {
         <ClassesTab
           initialClasses={initialData.classes}
           onRefresh={handleRefresh}
+          isAddClassOpen={isAddClassOpen}
+          setIsAddClassOpen={setIsAddClassOpen}
+          prefillAdd={prefillAddClass}
+          setPrefillAdd={setPrefillAddClass}
         />
       ) : (
         <AvailabilityTab
           initialAvailabilities={initialData.availabilities}
+          classes={initialData.classes}
           initialMaxHours={initialData.maxHoursPerDay}
           initialBlockedDates={initialData.blockedDates}
           onRefresh={handleRefresh}
+          isAddWindowOpen={isAddWindowOpen}
+          setIsAddWindowOpen={setIsAddWindowOpen}
+          prefillAddWindow={prefillAddWindow}
+          setPrefillAddWindow={setPrefillAddWindow}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
-

@@ -43,6 +43,7 @@ describe("Calendar Service", () => {
     let createdClassId = "";
     let createdAvailId = "";
     let createdTaskId = "";
+    let createdBlockedDateId = "";
 
     beforeAll(async () => {
       // Create student with profile
@@ -120,10 +121,24 @@ describe("Calendar Service", () => {
         },
       });
       createdTaskId = task.id;
+
+      // Add a blocked date on Thursday 2026-11-12 with confidential reason
+      const blocked = await prisma.blockedDate.create({
+        data: {
+          studentId,
+          dateStart: new Date("2026-11-12T00:00:00.000Z"),
+          dateEnd: new Date("2026-11-12T23:59:59.000Z"),
+          reason: "Confidential Personal Medical Appointment",
+        },
+      });
+      createdBlockedDateId = blocked.id;
     });
 
     afterAll(async () => {
       // Clean up specific test records
+      if (createdBlockedDateId) {
+        await prisma.blockedDate.deleteMany({ where: { id: createdBlockedDateId } });
+      }
       if (createdTaskId) {
         await prisma.task.deleteMany({ where: { id: createdTaskId } });
       }
@@ -186,6 +201,48 @@ describe("Calendar Service", () => {
       const taskItem = wednesday!.tasks[0];
       expect(taskItem.title).toBe("Prepare Slide Deck");
       expect(taskItem.estHours).toBe(1.5);
+    });
+
+    it("PRIVACY (acceptance test 6): loader data never contains class subjects or blocked-date reasons", async () => {
+      // Create a class with "Secret Subject"
+      const secretClass = await prisma.classSchedule.create({
+        data: {
+          studentId,
+          subject: "Secret Subject",
+          dayOfWeek: 1, // Monday
+          startMinutes: 540,
+          endMinutes: 660,
+        },
+      });
+
+      try {
+        const result = await getClientCalendarData(clientId, "2026-11-11T04:00:00.000Z");
+
+        // 1. Assert no `subject` field on any class, day, task or slot
+        const rawJson = JSON.stringify(result);
+        expect(rawJson).not.toContain("Secret Subject");
+        expect(rawJson).not.toContain("Confidential Personal Medical Appointment");
+
+        for (const day of result.days) {
+          expect((day as any).reason).toBeUndefined();
+          expect((day as any).blockedReason).toBeUndefined();
+          for (const c of day.classes) {
+            expect((c as any).subject).toBeUndefined();
+            expect(c.title).toBe("In class");
+          }
+          for (const s of day.openSlots) {
+            expect((s as any).subject).toBeUndefined();
+            expect((s as any).reason).toBeUndefined();
+          }
+        }
+
+        // Thursday (dayOfWeek = 4) must be blocked
+        const thursday = result.days.find((d) => d.dayOfWeek === 4);
+        expect(thursday).toBeDefined();
+        expect(thursday?.isBlocked).toBe(true);
+      } finally {
+        await prisma.classSchedule.deleteMany({ where: { id: secretClass.id } });
+      }
     });
   });
 });

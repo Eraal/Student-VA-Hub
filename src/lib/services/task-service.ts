@@ -1,6 +1,7 @@
 import { prisma } from "../prisma";
 import { TaskStatus, StudentResponse } from "@prisma/client";
 import { checkConflict, ConflictCheckResult } from "../conflict";
+import { createNotification } from "../notifications";
 import type {
   CreateTaskInput,
   CheckTaskConflictInput,
@@ -15,6 +16,7 @@ export interface TaskWithDetails {
   startAt: Date;
   dueAt: Date;
   estHours: number;
+  hoursWarning?: boolean;
   status: TaskStatus;
   studentResponse: StudentResponse | null;
   rescheduleReason: string | null;
@@ -153,30 +155,67 @@ export async function createTask(clientId: string, input: CreateTaskInput) {
     throw new Error(blockReason);
   }
 
-  const created = await prisma.task.create({
-    data: {
-      clientId,
-      studentId,
-      title: input.title.trim(),
-      description: input.description?.trim() ? input.description.trim() : null,
-      startAt: new Date(input.startAt),
-      dueAt: new Date(input.dueAt),
-      estHours: input.estHours,
-      status: TaskStatus.TODO,
-    },
-  });
+  const result = await prisma.$transaction(async (tx) => {
+    // Duplicate guard: reject if an identical task was created in the last 15 seconds
+    const fifteenSecondsAgo = new Date(Date.now() - 15000);
+    const duplicate = await tx.task.findFirst({
+      where: {
+        clientId,
+        studentId,
+        title: input.title.trim(),
+        startAt: new Date(input.startAt),
+        createdAt: { gte: fifteenSecondsAgo },
+      },
+    });
+    if (duplicate) {
+      throw new Error("This task was just created.");
+    }
 
-  // Create notification for student
-  await prisma.notification.create({
-    data: {
-      userId: studentId,
+    const clientUser = await tx.user.findUnique({
+      where: { id: clientId },
+      select: { name: true },
+    });
+    const clientName = clientUser?.name || "Client";
+
+    let warningSuffix = "";
+    if (conflictCheck.conflicts.some((c) => c.type === "EXCEEDS_AVAILABLE_HOURS")) {
+      warningSuffix = " Warning: Exceeds available hours.";
+    } else if (conflictCheck.conflicts.some((c) => c.type === "OUTSIDE_AVAILABILITY")) {
+      warningSuffix = " Warning: Outside regular hours.";
+    }
+
+    const created = await tx.task.create({
+      data: {
+        clientId,
+        studentId,
+        title: input.title.trim(),
+        description: input.description?.trim() || null,
+        startAt: new Date(input.startAt),
+        dueAt: new Date(input.dueAt),
+        estHours: input.estHours,
+        hoursWarning: conflictCheck.conflicts.some(
+          (conflict) => conflict.type === "EXCEEDS_AVAILABLE_HOURS"
+        ),
+        status: TaskStatus.TODO,
+      },
+    });
+
+    const message = warningSuffix
+      ? `${clientName} assigned you a task: ${created.title}.${warningSuffix}`
+      : `${clientName} assigned you a task: ${created.title}`;
+
+    await createNotification(tx, {
+      recipientId: studentId,
+      actorId: clientId,
       type: "TASK_ASSIGNED",
-      message: `New task assigned: "${created.title}"`,
-    },
+      message,
+    });
+
+    return created;
   });
 
   return {
-    task: created,
+    task: result,
     hasWarnings: conflictCheck.hasWarnings,
     warnings: conflictCheck.conflicts.filter((c) => c.severity === "WARN"),
   };
@@ -212,6 +251,7 @@ export async function getClientTasks(
       startAt: t.startAt,
       dueAt: t.dueAt,
       estHours: t.estHours,
+      hoursWarning: t.hoursWarning,
       status: t.status,
       studentResponse: t.studentResponse,
       rescheduleReason: t.rescheduleReason,
@@ -253,6 +293,7 @@ export async function getStudentTasks(
       startAt: t.startAt,
       dueAt: t.dueAt,
       estHours: t.estHours,
+      hoursWarning: t.hoursWarning,
       status: t.status,
       studentResponse: t.studentResponse,
       rescheduleReason: t.rescheduleReason,
@@ -292,6 +333,7 @@ export async function getTaskById(taskId: string, userId: string): Promise<TaskW
     startAt: task.startAt,
     dueAt: task.dueAt,
     estHours: task.estHours,
+    hoursWarning: task.hoursWarning,
     status: task.status,
     studentResponse: task.studentResponse,
     rescheduleReason: task.rescheduleReason,
@@ -333,29 +375,74 @@ export async function respondToTask(
   response: StudentResponse,
   rescheduleReason?: string
 ) {
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
-  if (!task || task.studentId !== studentId) {
-    throw new Error("Task not found or unauthorized.");
-  }
-
-  const updated = await prisma.task.update({
-    where: { id: taskId },
-    data: {
-      studentResponse: response,
-      rescheduleReason: response === "RESCHEDULE_REQUESTED" ? rescheduleReason?.trim() : null,
-    },
-  });
-
-  if (response === "RESCHEDULE_REQUESTED") {
-    await prisma.notification.create({
-      data: {
-        userId: task.clientId,
-        type: "RESCHEDULE_REQUESTED",
-        message: `Student requested reschedule for "${task.title}": ${rescheduleReason ?? ""}`,
+  return await prisma.$transaction(async (tx) => {
+    const task = await tx.task.findUnique({
+      where: { id: taskId },
+      include: {
+        student: { select: { id: true, name: true } },
       },
     });
-  }
 
-  return updated;
+    if (!task || task.studentId !== studentId) {
+      throw new Error("Task not found or unauthorized.");
+    }
+
+    // Atomic conditional update:
+    // When accepting: only if studentResponse is currently null (not already accepted, not reschedule-requested)
+    // When requesting reschedule: allow if currently null OR ACCEPTED, but reject if already RESCHEDULE_REQUESTED (no duplicate)
+    // In both cases: task status must not be DONE
+    const updatedResult = await tx.task.updateMany({
+      where: {
+        id: taskId,
+        studentId,
+        status: { not: TaskStatus.DONE },
+        ...(response === "RESCHEDULE_REQUESTED"
+          ? {
+              OR: [
+                { studentResponse: null },
+                { studentResponse: StudentResponse.ACCEPTED },
+              ],
+            }
+          : {
+              studentResponse: null,
+            }),
+      },
+      data: {
+        studentResponse: response,
+        rescheduleReason:
+          response === "RESCHEDULE_REQUESTED" && rescheduleReason?.trim()
+            ? rescheduleReason.trim().slice(0, 140)
+            : null,
+      },
+    });
+
+    if (updatedResult.count !== 1) {
+      throw new Error("This was already done.");
+    }
+
+    const studentName = task.student.name || "Student";
+    const truncatedReason = rescheduleReason?.trim()
+      ? rescheduleReason.trim().slice(0, 140)
+      : "";
+
+    if (response === "ACCEPTED") {
+      await createNotification(tx, {
+        recipientId: task.clientId,
+        actorId: studentId,
+        type: "TASK_ACCEPTED",
+        message: `${studentName} accepted: ${task.title}`,
+      });
+    } else if (response === "RESCHEDULE_REQUESTED") {
+      const reasonPart = truncatedReason ? `. Reason: ${truncatedReason}` : "";
+      await createNotification(tx, {
+        recipientId: task.clientId,
+        actorId: studentId,
+        type: "RESCHEDULE_REQUESTED",
+        message: `${studentName} asked to reschedule ${task.title}${reasonPart}`,
+      });
+    }
+
+    return await tx.task.findUniqueOrThrow({ where: { id: taskId } });
+  });
 }
 

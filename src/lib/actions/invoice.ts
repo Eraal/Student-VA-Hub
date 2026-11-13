@@ -15,6 +15,7 @@ import {
   respondToCorrection,
   markInvoicePaid,
 } from "@/lib/services/invoice-service";
+import { toUserErrorMessage } from "@/lib/errors";
 import type { ActionResult } from "./profile";
 
 /**
@@ -46,8 +47,7 @@ export async function approveTimeLogAction(
       data: { invoiceId: res.invoice.id, amount: res.invoice.amount },
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to approve hours.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -80,8 +80,7 @@ export async function disputeTimeLogAction(
 
     return { success: true };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to dispute hours.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -111,8 +110,7 @@ export async function respondCorrectionAction(
 
     return { success: true };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to respond to correction.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -140,8 +138,7 @@ export async function markInvoicePaidAction(
 
     return { success: true, data: { invoiceId: updated.id } };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to mark invoice as paid.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 

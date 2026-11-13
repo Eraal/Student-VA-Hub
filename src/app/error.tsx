@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { toUserErrorMessage } from "@/lib/errors";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 
 export default function GlobalError({
@@ -23,14 +24,14 @@ export default function GlobalError({
         </div>
 
         <div className="space-y-1">
-          <span className="text-xs font-mono font-semibold uppercase tracking-wider text-[var(--color-conflict)]">
-            May naganap na problema
+          <span className="text-xs font-mono font-semibold tracking-wider text-[var(--color-conflict)]">
+            Application error
           </span>
           <h1 className="text-xl font-bold tracking-tight text-[var(--color-text)]">
             Something went wrong
           </h1>
           <p className="text-xs text-[var(--color-muted)] max-w-sm mx-auto">
-            {error.message || "Isang hindi inaasahang error ang naganap habang pinoproseso ang request."}
+            {toUserErrorMessage(error)}
           </p>
         </div>
 
@@ -41,7 +42,7 @@ export default function GlobalError({
             className="gap-1.5 text-xs cursor-pointer bg-[var(--color-accent)] text-[var(--color-accent-fg)]"
           >
             <RotateCcw className="size-3.5" />
-            <span>Subukan Muli</span>
+            <span>Try again</span>
           </Button>
         </div>
       </div>

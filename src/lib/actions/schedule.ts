@@ -20,6 +20,7 @@ import {
   addBlockedDate,
   deleteBlockedDate,
 } from "@/lib/services/schedule-service";
+import { toUserErrorMessage, formatZodFieldErrors } from "@/lib/errors";
 import type { ActionResult } from "./profile";
 
 /**
@@ -33,14 +34,11 @@ export async function addClassAction(
 
   const parsed = classScheduleInputSchema.safeParse(rawData);
   if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0];
-      if (field && typeof field === "string" && !fieldErrors[field]) {
-        fieldErrors[field] = issue.message;
-      }
-    }
-    return { success: false, error: "Please fix the schedule errors.", fieldErrors };
+    return {
+      success: false,
+      error: "Please fix the schedule errors.",
+      fieldErrors: formatZodFieldErrors(parsed.error),
+    };
   }
 
   try {
@@ -52,8 +50,7 @@ export async function addClassAction(
       data: { id: res.classItem.id, warning: res.warning },
     };
   } catch (err) {
-    console.error("addClassAction error:", err);
-    return { success: false, error: "Failed to add class schedule." };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -68,14 +65,11 @@ export async function updateClassAction(
 
   const parsed = classScheduleUpdateSchema.safeParse(rawData);
   if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0];
-      if (field && typeof field === "string" && !fieldErrors[field]) {
-        fieldErrors[field] = issue.message;
-      }
-    }
-    return { success: false, error: "Please fix the schedule errors.", fieldErrors };
+    return {
+      success: false,
+      error: "Please fix the schedule errors.",
+      fieldErrors: formatZodFieldErrors(parsed.error),
+    };
   }
 
   try {
@@ -87,8 +81,7 @@ export async function updateClassAction(
       data: { id: res.classItem.id, warning: res.warning },
     };
   } catch (err) {
-    console.error("updateClassAction error:", err);
-    return { success: false, error: "Failed to update class schedule." };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -107,8 +100,7 @@ export async function deleteClassAction(classId: string): Promise<ActionResult> 
     revalidatePath("/student");
     return { success: true };
   } catch (err) {
-    console.error("deleteClassAction error:", err);
-    return { success: false, error: "Failed to delete class schedule." };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -123,14 +115,11 @@ export async function addAvailabilityAction(
 
   const parsed = availabilityInputSchema.safeParse(rawData);
   if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0];
-      if (field && typeof field === "string" && !fieldErrors[field]) {
-        fieldErrors[field] = issue.message;
-      }
-    }
-    return { success: false, error: "Please fix availability errors.", fieldErrors };
+    return {
+      success: false,
+      error: "Please fix availability errors.",
+      fieldErrors: formatZodFieldErrors(parsed.error),
+    };
   }
 
   try {
@@ -139,8 +128,7 @@ export async function addAvailabilityAction(
     revalidatePath("/student");
     return { success: true, data: { id: created.id } };
   } catch (err) {
-    console.error("addAvailabilityAction error:", err);
-    return { success: false, error: "Failed to add availability." };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -159,8 +147,7 @@ export async function deleteAvailabilityAction(availabilityId: string): Promise<
     revalidatePath("/student");
     return { success: true };
   } catch (err) {
-    console.error("deleteAvailabilityAction error:", err);
-    return { success: false, error: "Failed to delete availability." };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -184,8 +171,7 @@ export async function updateMaxHoursAction(
     revalidatePath("/student");
     return { success: true, data: { maxHoursPerDay: updated.maxHoursPerDay } };
   } catch (err) {
-    console.error("updateMaxHoursAction error:", err);
-    return { success: false, error: "Failed to update max hours." };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -200,14 +186,11 @@ export async function addBlockedDateAction(
 
   const parsed = blockedDateInputSchema.safeParse(rawData);
   if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0];
-      if (field && typeof field === "string" && !fieldErrors[field]) {
-        fieldErrors[field] = issue.message;
-      }
-    }
-    return { success: false, error: "Please fix blocked date errors.", fieldErrors };
+    return {
+      success: false,
+      error: "Please fix blocked date errors.",
+      fieldErrors: formatZodFieldErrors(parsed.error),
+    };
   }
 
   try {
@@ -216,8 +199,7 @@ export async function addBlockedDateAction(
     revalidatePath("/student");
     return { success: true, data: { id: created.id } };
   } catch (err) {
-    console.error("addBlockedDateAction error:", err);
-    return { success: false, error: "Failed to add blocked date." };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -236,8 +218,7 @@ export async function deleteBlockedDateAction(blockedDateId: string): Promise<Ac
     revalidatePath("/student");
     return { success: true };
   } catch (err) {
-    console.error("deleteBlockedDateAction error:", err);
-    return { success: false, error: "Failed to delete blocked date." };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 

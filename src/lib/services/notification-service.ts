@@ -12,15 +12,22 @@ export interface NotificationItem {
 /**
  * Retrieves notifications for a user, sorted newest first, along with unread count.
  */
-export async function getUserNotifications(userId: string): Promise<{
+export async function getUserNotifications(
+  userId: string,
+  options?: { take?: number; skip?: number }
+): Promise<{
   notifications: NotificationItem[];
   unreadCount: number;
 }> {
+  const take = options?.take ?? 50;
+  const skip = options?.skip ?? 0;
+
   const [notifications, unreadCount] = await Promise.all([
     prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-      take: 50,
+      take,
+      skip,
     }),
     prisma.notification.count({
       where: { userId, readAt: null },

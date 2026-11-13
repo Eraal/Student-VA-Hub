@@ -6,6 +6,7 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
 } from "@/lib/services/notification-service";
+import { toUserErrorMessage } from "@/lib/errors";
 
 export async function markNotificationReadAction(notificationId: string) {
   try {
@@ -23,8 +24,7 @@ export async function markNotificationReadAction(notificationId: string) {
     revalidatePath("/client/notifications");
     return { success: true };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update notification";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -41,8 +41,7 @@ export async function markAllNotificationsReadAction() {
     revalidatePath("/client/notifications");
     return { success: true };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to update notifications";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 

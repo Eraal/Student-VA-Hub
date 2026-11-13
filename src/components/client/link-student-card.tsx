@@ -6,66 +6,79 @@ import { linkStudentSchema, updateHourlyRateSchema } from "@/lib/validations/lin
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
-  CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
+  CardContent,
 } from "@/components/ui/card";
 import {
-  GraduationCap,
-  Link as LinkIcon,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Edit2,
-  School,
-  BookOpen,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { StatusBadge } from "@/lib/labels";
+import { formatDate, formatPeso } from "@/lib/format";
+import { toUserErrorMessage } from "@/lib/errors";
+import { toast } from "@/components/ui/toast";
+import { getInitials } from "@/components/profile/profile-header-card";
+import { Loader2, AlertCircle, Edit2 } from "lucide-react";
 
-interface LinkStudentCardProps {
-  initialLink: {
+export interface ClientLinkedStudentData {
+  id: string;
+  hourlyRate: number;
+  status: string;
+  createdAt?: Date | string;
+  student: {
     id: string;
-    hourlyRate: number;
-    status: string;
-    student: {
-      id: string;
-      name: string;
-      email: string;
-      studentProfile: {
-        school: string;
-        course: string;
-        year: number;
-      } | null;
-    };
-  } | null;
+    name: string;
+    email: string;
+  };
 }
 
-export function LinkStudentCard({ initialLink }: LinkStudentCardProps) {
-  const [link, setLink] = React.useState(initialLink);
+interface LinkStudentCardProps {
+  initialLink: ClientLinkedStudentData | null;
+  onLinkUpdated?: (link: ClientLinkedStudentData | null) => void;
+}
 
-  // Link Form State
+export function LinkStudentCard({
+  initialLink,
+  onLinkUpdated,
+}: LinkStudentCardProps) {
+  const [link, setLink] = React.useState<ClientLinkedStudentData | null>(
+    initialLink
+  );
+
+  // Link Form State (When not linked)
   const [code, setCode] = React.useState("");
   const [hourlyRate, setHourlyRate] = React.useState<number | string>(150);
   const [isLinking, setIsLinking] = React.useState(false);
   const [linkError, setLinkError] = React.useState<string | null>(null);
-  const [linkSuccess, setLinkSuccess] = React.useState<string | null>(null);
 
-  // Rate Editing State
-  const [isEditingRate, setIsEditingRate] = React.useState(false);
-  const [newRate, setNewRate] = React.useState<number | string>(
-    initialLink?.hourlyRate ?? 150,
+  // Edit Rate Dialog State (When linked)
+  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const [rateInput, setRateInput] = React.useState<number | string>(
+    initialLink?.hourlyRate ?? 150
   );
   const [isSavingRate, setIsSavingRate] = React.useState(false);
-  const [rateError, setRateError] = React.useState<string | null>(null);
-  const [rateSuccess, setRateSuccess] = React.useState<string | null>(null);
+  const [dialogError, setDialogError] = React.useState<string | null>(null);
+
+  // Strip pasted spaces and dashes, auto-uppercase, max 8 chars
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const sanitized = raw.replace(/[\s-]/g, "").toUpperCase().slice(0, 8);
+    setCode(sanitized);
+    if (linkError) setLinkError(null);
+  };
 
   const handleLinkSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLinkError(null);
-    setLinkSuccess(null);
 
     const formData = {
       code: code.trim().toUpperCase(),
@@ -76,7 +89,7 @@ export function LinkStudentCard({ initialLink }: LinkStudentCardProps) {
     if (!parsed.success) {
       setLinkError(
         parsed.error.issues[0]?.message ??
-          "Please enter a valid 8-character invite code and positive rate.",
+          "Please enter a valid 8-character invite code and rate."
       );
       return;
     }
@@ -87,334 +100,349 @@ export function LinkStudentCard({ initialLink }: LinkStudentCardProps) {
       const res = await linkStudentAction(formData);
 
       if (!res.success) {
-        setLinkError(res.error ?? "Failed to link student. Please try again.");
+        setLinkError(
+          toUserErrorMessage(res.error ?? "Failed to link student.")
+        );
         setIsLinking(false);
         return;
       }
 
-      setLinkSuccess(`Successfully linked with ${res.data?.studentName}!`);
+      toast.success(
+        `Successfully linked with ${res.data?.studentName ?? "student"}!`
+      );
       // Reload page to refresh linked student details
       window.location.reload();
     } catch (err) {
-      console.error(err);
-      setLinkError("An unexpected error occurred while linking.");
+      setLinkError(toUserErrorMessage(err));
       setIsLinking(false);
     }
   };
 
-  const handleRateSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleOpenEditRate = () => {
+    if (!link) return;
+    setRateInput(link.hourlyRate);
+    setDialogError(null);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveRate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setRateError(null);
-    setRateSuccess(null);
+    setDialogError(null);
 
-    const formData = {
-      hourlyRate: Number(newRate),
-    };
-
-    const parsed = updateHourlyRateSchema.safeParse(formData);
+    const numericRate = Number(rateInput);
+    const parsed = updateHourlyRateSchema.safeParse({ hourlyRate: numericRate });
     if (!parsed.success) {
-      setRateError(parsed.error.issues[0]?.message ?? "Invalid hourly rate.");
+      setDialogError(
+        parsed.error.issues[0]?.message ?? "Invalid hourly rate."
+      );
       return;
     }
 
     setIsSavingRate(true);
 
     try {
-      const res = await updateHourlyRateAction(formData);
+      const res = await updateHourlyRateAction({ hourlyRate: numericRate });
 
       if (!res.success || !res.data) {
-        setRateError(res.error ?? "Failed to update hourly rate.");
+        setDialogError(
+          toUserErrorMessage(res.error ?? "Failed to update hourly rate.")
+        );
         setIsSavingRate(false);
         return;
       }
 
-      setRateSuccess("Hourly rate updated successfully.");
+      toast.success(`Rate updated to ${formatPeso(res.data.hourlyRate)}/hr`);
       if (link) {
-        setLink({
+        const updatedLink = {
           ...link,
           hourlyRate: res.data.hourlyRate,
-        });
+        };
+        setLink(updatedLink);
+        onLinkUpdated?.(updatedLink);
       }
-      setIsEditingRate(false);
       setIsSavingRate(false);
+      setIsEditDialogOpen(false);
     } catch (err) {
-      console.error(err);
-      setRateError("An unexpected error occurred.");
+      setDialogError(toUserErrorMessage(err));
       setIsSavingRate(false);
     }
   };
 
+  const numericNewRate = Number(rateInput);
+  const isValidNewRate = !isNaN(numericNewRate) && numericNewRate > 0;
+
   return (
-    <div className="space-y-4">
-      {/* If already linked, display Linked Student Card */}
+    <>
       {link ? (
-        <Card className="border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex size-7 items-center justify-center rounded-md bg-[var(--color-class-bg)] text-[var(--color-class)]">
-                  <GraduationCap className="size-4" />
-                </div>
-                <div>
-                  <CardTitle className="text-base font-semibold text-[var(--color-text)]">
-                    Linked Student VA
-                  </CardTitle>
-                  <CardDescription className="text-xs text-[var(--color-muted)]">
-                    Assigned virtual assistant details and hourly agreement
-                  </CardDescription>
-                </div>
+        /* ===================================================================
+           STATE A: Student is linked -> Linked Student Card
+           =================================================================== */
+        <Card
+          data-testid="linked-card"
+          className="border-[1.5px] border-[#0F172A] bg-white shadow-[3px_3px_0px_0px_#0F172A] rounded-2xl"
+        >
+          <CardHeader className="px-5 py-4 sm:px-6 sm:py-4 border-b border-[#E5DFD5]">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle className="font-display text-lg font-bold text-[#0F172A]">
+                  Linked student
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm text-slate-600">
+                  Your student VA and agreed hourly rate.
+                </CardDescription>
               </div>
-              <Badge variant="secondary" className="text-[10px]">
-                {link.status}
-              </Badge>
+              <StatusBadge status={link.status} />
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-4 pt-0">
-            {rateSuccess && (
-              <div
-                role="status"
-                className="flex items-start gap-2.5 rounded-md border border-[var(--color-work)] bg-[var(--color-work-bg)] p-3 text-xs text-[var(--color-work)]"
-              >
-                <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
-                <span>{rateSuccess}</span>
-              </div>
-            )}
+          <CardContent className="p-5 sm:p-6 space-y-5">
+            {/* Student identity header */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar className="size-11 sm:size-12 shrink-0 border-[1.5px] border-[#0F172A] bg-[#0F172A]">
+                  <AvatarFallback className="text-sm sm:text-base font-display font-bold text-white bg-[#0F172A]">
+                    {getInitials(link.student.name)}
+                  </AvatarFallback>
+                </Avatar>
 
-            {rateError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2.5 rounded-md border border-[var(--color-conflict)] bg-[var(--color-conflict-bg)] p-3 text-xs text-[var(--color-conflict)]"
-              >
-                <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                <span>{rateError}</span>
-              </div>
-            )}
-
-            {/* Student Info Box */}
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-4 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--color-border)] pb-3">
-                <div>
-                  <span className="text-sm font-semibold text-[var(--color-text)] block">
+                <div className="min-w-0 space-y-0.5">
+                  <p className="font-display text-base font-bold text-[#0F172A] truncate">
                     {link.student.name}
-                  </span>
-                  <span className="text-xs text-[var(--color-muted)]">
+                  </p>
+                  <p className="text-xs text-slate-600 truncate">
                     {link.student.email}
-                  </span>
-                </div>
-
-                {/* Rate Display / Inline Editor */}
-                <div className="flex items-center gap-2">
-                  {!isEditingRate ? (
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <span className="text-[10px] text-[var(--color-muted)] block uppercase font-medium">
-                          Agreed Rate
-                        </span>
-                        <span className="text-sm font-bold text-[var(--color-text)]">
-                          ₱{link.hourlyRate}/hr
-                        </span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="xs"
-                        onClick={() => {
-                          setIsEditingRate(true);
-                          setNewRate(link.hourlyRate);
-                          setRateError(null);
-                          setRateSuccess(null);
-                        }}
-                        className="gap-1 text-xs cursor-pointer ml-1"
-                      >
-                        <Edit2 className="size-3" />
-                        <span>Edit</span>
-                      </Button>
-                    </div>
-                  ) : (
-                    <form
-                      onSubmit={handleRateSubmit}
-                      className="flex items-center gap-2"
-                    >
-                      <div className="w-24">
-                        <Input
-                          type="number"
-                          step={1}
-                          min={1}
-                          value={newRate}
-                          onChange={(e) => setNewRate(e.target.value)}
-                          disabled={isSavingRate}
-                          className="h-8 text-xs bg-[var(--color-surface)]"
-                        />
-                      </div>
-                      <Button
-                        type="submit"
-                        size="xs"
-                        disabled={isSavingRate}
-                        className="h-8 bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-xs cursor-pointer"
-                      >
-                        {isSavingRate ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : (
-                          "Save"
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        disabled={isSavingRate}
-                        onClick={() => setIsEditingRate(false)}
-                        className="h-8 text-xs cursor-pointer"
-                      >
-                        Cancel
-                      </Button>
-                    </form>
-                  )}
+                  </p>
                 </div>
               </div>
 
-              {/* Student Profile Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
-                <div className="flex items-center gap-1.5 text-[var(--color-muted)]">
-                  <School className="size-3.5" />
-                  <span>
-                    School:{" "}
-                    <strong className="text-[var(--color-text)] font-medium">
-                      {link.student.studentProfile?.school ?? "N/A"}
-                    </strong>
-                  </span>
-                </div>
+              {/* Rate pill & Edit button */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="inline-flex items-center rounded-full border-[1.5px] border-[#0F172A] bg-white px-3 py-1 text-xs font-bold font-display tabular-nums text-[#0F172A] shadow-[1.5px_1.5px_0px_0px_#0F172A]">
+                  {`${formatPeso(link.hourlyRate)}/hr`}
+                </span>
 
-                <div className="flex items-center gap-1.5 text-[var(--color-muted)]">
-                  <BookOpen className="size-3.5" />
-                  <span>
-                    Course:{" "}
-                    <strong className="text-[var(--color-text)] font-medium">
-                      {link.student.studentProfile?.course ?? "N/A"}
-                    </strong>
-                  </span>
-                </div>
-
-                <div className="text-[var(--color-muted)]">
-                  Year Level:{" "}
-                  <strong className="text-[var(--color-text)] font-medium">
-                    {link.student.studentProfile?.year
-                      ? `Year ${link.student.studentProfile.year}`
-                      : "N/A"}
-                  </strong>
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid="edit-rate-open"
+                  onClick={handleOpenEditRate}
+                  className="h-8 min-h-[32px] px-2.5 text-xs font-bold"
+                >
+                  <Edit2 className="size-3" />
+                  <span>Edit rate</span>
+                </Button>
               </div>
             </div>
+
+            {link.createdAt && (
+              <p className="text-xs text-slate-500 pt-3 border-t border-[#E5DFD5]">
+                Linked since {formatDate(link.createdAt)}
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : (
-        /* If no student linked yet, show Link Student Form */
-        <Card className="border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)]">
-                <LinkIcon className="size-4" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-semibold text-[var(--color-text)]">
-                  Link Student VA
-                </CardTitle>
-                <CardDescription className="text-xs text-[var(--color-muted)]">
-                  Enter your student&apos;s 8-character invite code and agree on an hourly rate
-                </CardDescription>
-              </div>
-            </div>
+        /* ===================================================================
+           STATE B: No student linked -> Link Student Card
+           =================================================================== */
+        <Card className="border-[1.5px] border-[#0F172A] bg-white shadow-[3px_3px_0px_0px_#0F172A] rounded-2xl">
+          <CardHeader className="px-5 py-4 sm:px-6 sm:py-4 border-b border-[#E5DFD5]">
+            <CardTitle className="font-display text-lg font-bold text-[#0F172A]">
+              Link student
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm text-slate-600">
+              Enter your student&apos;s 8-character invite code and agree on an hourly rate.
+            </CardDescription>
           </CardHeader>
 
-          <form onSubmit={handleLinkSubmit}>
-            <CardContent className="space-y-4 pt-1">
-              {linkSuccess && (
-                <div
-                  role="status"
-                  className="flex items-start gap-2.5 rounded-md border border-[var(--color-work)] bg-[var(--color-work-bg)] p-3 text-xs text-[var(--color-work)]"
-                >
-                  <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
-                  <span>{linkSuccess}</span>
-                </div>
-              )}
-
+          <CardContent className="p-5 sm:p-6">
+            <form onSubmit={handleLinkSubmit} className="space-y-4 sm:space-y-5">
               {linkError && (
                 <div
                   role="alert"
-                  className="flex items-start gap-2.5 rounded-md border border-[var(--color-conflict)] bg-[var(--color-conflict-bg)] p-3 text-xs text-[var(--color-conflict)]"
+                  aria-live="polite"
+                  className="flex items-start gap-2.5 rounded-lg border-[1.5px] border-[#DC2626] bg-[#FEF2F2] p-3 text-xs sm:text-sm text-[#991B1B]"
                 >
                   <AlertCircle className="size-4 shrink-0 mt-0.5" />
                   <span>{linkError}</span>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="invite-code"
-                    className="text-xs font-medium text-[var(--color-text)]"
-                  >
-                    Invite Code (8 Characters)
-                  </Label>
-                  <Input
-                    id="invite-code"
-                    placeholder="e.g. EDMAXNXY"
-                    maxLength={8}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    disabled={isLinking}
-                    className="font-mono uppercase tracking-wider bg-[var(--color-bg)] text-xs"
-                  />
-                  <p className="text-[11px] text-[var(--color-muted)]">
-                    Ask your Student VA for their active code from their settings.
-                  </p>
-                </div>
+              {/* Invite Code Input */}
+              <div className="space-y-1.5 w-full">
+                <Label
+                  htmlFor="invite-code"
+                  className="text-xs sm:text-sm font-bold text-[#0F172A]"
+                >
+                  Invite code
+                </Label>
+                <Input
+                  id="invite-code"
+                  data-testid="link-student-code"
+                  placeholder="e.g. QDFCYKAP"
+                  maxLength={8}
+                  value={code}
+                  onChange={handleCodeChange}
+                  disabled={isLinking}
+                  className="w-full font-mono uppercase tracking-widest text-sm"
+                />
+                <p className="text-xs text-slate-500">
+                  Ask your Student VA for their active 8-character code.
+                </p>
+              </div>
 
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="hourly-rate"
-                    className="text-xs font-medium text-[var(--color-text)]"
-                  >
-                    Hourly Rate (PHP ₱)
-                  </Label>
+              {/* Hourly Rate Input with ₱ prefix */}
+              <div className="space-y-1.5 w-full">
+                <Label
+                  htmlFor="hourly-rate"
+                  className="text-xs sm:text-sm font-bold text-[#0F172A]"
+                >
+                  Hourly rate (PHP)
+                </Label>
+                <div className="relative w-full">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-[#0F172A] text-sm select-none font-display">
+                    ₱
+                  </span>
                   <Input
                     id="hourly-rate"
+                    data-testid="link-student-rate"
                     type="number"
                     min={1}
                     step={1}
                     value={hourlyRate}
                     onChange={(e) => setHourlyRate(e.target.value)}
                     disabled={isLinking}
-                    className="bg-[var(--color-bg)] text-xs"
+                    className="w-full pl-8 text-sm font-display tabular-nums"
                   />
-                  <p className="text-[11px] text-[var(--color-muted)]">
-                    Agreed rate per hour (e.g. 150 for ₱150/hr).
-                  </p>
                 </div>
+                <p className="text-xs text-slate-500">
+                  Agreed rate per hour (e.g. 150 for ₱150.00/hr).
+                </p>
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="pt-2 border-t border-[#E5DFD5] flex justify-end">
                 <Button
                   type="submit"
-                  disabled={isLinking || code.length !== 8}
-                  className="bg-[var(--color-accent)] text-[var(--color-accent-fg)] hover:bg-[var(--color-accent-hover)] text-xs font-medium h-9 cursor-pointer"
+                  data-testid="link-student-submit"
+                  disabled={isLinking || code.length !== 8 || !hourlyRate}
+                  className="w-full sm:w-auto min-h-[40px] font-bold disabled:opacity-40"
                 >
                   {isLinking ? (
                     <span className="flex items-center gap-2">
-                      <Loader2 className="size-3.5 animate-spin" />
+                      <Loader2 className="size-4 animate-spin" />
                       <span>Linking student...</span>
                     </span>
                   ) : (
-                    <span>Link Student</span>
+                    <span>Link student</span>
                   )}
                 </Button>
               </div>
-            </CardContent>
-          </form>
+            </form>
+          </CardContent>
         </Card>
       )}
-    </div>
+
+      {/* Edit Hourly Rate Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit hourly rate</DialogTitle>
+            <DialogDescription>
+              Update the agreed hourly rate for {link?.student.name ?? "your student"}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveRate} className="space-y-4 pt-2">
+            {dialogError && (
+              <div
+                role="alert"
+                aria-live="polite"
+                className="flex items-start gap-2.5 rounded-lg border-[1.5px] border-[#DC2626] bg-[#FEF2F2] p-3 text-xs sm:text-sm text-[#991B1B]"
+              >
+                <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                <span>{dialogError}</span>
+              </div>
+            )}
+
+            {/* Current rate indicator */}
+            {link && (
+              <div className="rounded-lg border-[1.5px] border-[#E5DFD5] bg-[#FAF7F2] p-3 text-xs sm:text-sm flex items-center justify-between">
+                <span className="text-slate-600 font-medium">Current rate</span>
+                <span className="font-display tabular-nums font-bold text-[#0F172A]">
+                  {formatPeso(link.hourlyRate)}/hr
+                </span>
+              </div>
+            )}
+
+            {/* Rate Input */}
+            <div className="space-y-1.5 w-full">
+              <Label
+                htmlFor="dialog-hourly-rate"
+                className="text-xs sm:text-sm font-bold text-[#0F172A]"
+              >
+                New hourly rate (PHP)
+              </Label>
+              <div className="relative w-full">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-[#0F172A] text-sm select-none font-display">
+                  ₱
+                </span>
+                <Input
+                  id="dialog-hourly-rate"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                  disabled={isSavingRate}
+                  className="w-full pl-8 text-sm font-display tabular-nums"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Live Rate Preview */}
+            {link && isValidNewRate && (
+              <div className="rounded-lg border-[1.5px] border-[#0F172A] bg-white p-3 text-xs sm:text-sm shadow-[1.5px_1.5px_0px_0px_#0F172A] flex items-center justify-between">
+                <span className="text-slate-600 font-medium">Rate preview</span>
+                <span className="font-display tabular-nums font-bold text-[#0F172A]">
+                  {formatPeso(link.hourlyRate)} → {formatPeso(numericNewRate)}/hr
+                </span>
+              </div>
+            )}
+
+            {/* Explanatory Helper Text */}
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Applies to all unbilled time logs (pending and approved). Existing generated invoices will keep their original rate.
+            </p>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSavingRate}
+                onClick={() => setIsEditDialogOpen(false)}
+                className="w-full sm:w-auto min-h-[40px] font-bold"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSavingRate || !rateInput || Number(rateInput) <= 0}
+                className="w-full sm:w-auto min-h-[40px] font-bold disabled:opacity-40"
+              >
+                {isSavingRate ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="size-4 animate-spin" />
+                    <span>Saving...</span>
+                  </span>
+                ) : (
+                  <span>Save rate</span>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
-

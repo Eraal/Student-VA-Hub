@@ -84,7 +84,7 @@ export async function loginAction(
     await signIn("credentials", {
       email: normalizedEmail,
       password,
-      redirectTo: targetUrl,
+      redirect: false,
     });
 
     return {

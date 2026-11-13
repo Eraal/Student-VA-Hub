@@ -16,6 +16,7 @@ import {
   updateTaskStatus,
   respondToTask,
 } from "@/lib/services/task-service";
+import { toUserErrorMessage } from "@/lib/errors";
 import type { ActionResult } from "./profile";
 import type { ConflictCheckResult } from "../conflict";
 
@@ -83,8 +84,7 @@ export async function createTaskAction(
       data: { id: res.task.id, hasWarnings: res.hasWarnings },
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to assign task.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -117,8 +117,7 @@ export async function updateTaskStatusAction(
 
     return { success: true, data: { id: updated.id, status: updated.status } };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to update status.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }
 
@@ -159,7 +158,6 @@ export async function respondToTaskAction(
       data: { id: updated.id, response: updated.studentResponse! },
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to respond to task.";
-    return { success: false, error: message };
+    return { success: false, error: toUserErrorMessage(err) };
   }
 }

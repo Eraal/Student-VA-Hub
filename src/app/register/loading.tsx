@@ -1,15 +1,14 @@
 export default function RegisterLoading() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[var(--color-bg)] px-4 py-8">
-      <div className="w-full max-w-md rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4 animate-pulse">
-        <div className="h-6 w-36 rounded bg-[var(--color-border)]" />
-        <div className="h-4 w-56 rounded bg-[var(--color-border)]" />
-        <div className="h-10 w-full rounded bg-[var(--color-border)]" />
-        <div className="h-10 w-full rounded bg-[var(--color-border)]" />
-        <div className="h-10 w-full rounded bg-[var(--color-border)]" />
-        <div className="h-10 w-full rounded bg-[var(--color-border)]" />
+    <main className="flex min-h-screen items-center justify-center bg-white p-6">
+      <div className="w-full max-w-[380px] space-y-4 animate-pulse">
+        <div className="h-6 w-48 rounded bg-[#E5DFD5]/50" />
+        <div className="h-4 w-60 rounded bg-[#E5DFD5]/40" />
+        <div className="h-9 w-full rounded bg-[#E5DFD5]/30 mt-6" />
+        <div className="h-9 w-full rounded bg-[#E5DFD5]/30" />
+        <div className="h-9 w-full rounded bg-[#E5DFD5]/30" />
+        <div className="h-9 w-full rounded bg-[#0F172A]/20" />
       </div>
     </main>
   );
 }
-

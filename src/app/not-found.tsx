@@ -19,7 +19,7 @@ export default function NotFound() {
             Page Not Found
           </h1>
           <p className="text-xs text-[var(--color-muted)] max-w-xs mx-auto">
-            Paumanhin, ang pahinang sinusubukan mong puntahan ay hindi umiiral o nailipat na.
+            The page you are looking for does not exist or has been moved.
           </p>
         </div>
 
@@ -27,7 +27,7 @@ export default function NotFound() {
           <Link href="/">
             <Button size="sm" variant="outline" className="gap-1.5 text-xs cursor-pointer">
               <ArrowLeft className="size-3.5" />
-              <span>Bumalik sa Home</span>
+              <span>Back to Home</span>
             </Button>
           </Link>
         </div>

@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormattedTimeLog } from "@/lib/services/time-service";
 import { requestCorrectionAction } from "@/lib/actions/time";
+import { toUserErrorMessage } from "@/lib/errors";
+import { toast } from "@/components/ui/toast";
+import { formatDateTime } from "@/lib/format";
 import { X, Loader2, AlertCircle, Clock } from "lucide-react";
 
 interface CorrectionDialogProps {
@@ -58,17 +61,21 @@ export function CorrectionDialog({
       });
 
       if (!res.success) {
-        setServerError(res.error ?? "Failed to request correction.");
+        const errorMsg = toUserErrorMessage(res.error ?? "Failed to request correction.");
+        setServerError(errorMsg);
+        toast.error(errorMsg);
         setIsSubmitting(false);
         return;
       }
 
+      toast.success("Correction request sent to client.");
       setIsSubmitting(false);
       onSuccess();
       onClose();
     } catch (err) {
-      console.error(err);
-      setServerError("An unexpected error occurred.");
+      const errorMsg = toUserErrorMessage(err);
+      setServerError(errorMsg);
+      toast.error(errorMsg);
       setIsSubmitting(false);
     }
   };
@@ -77,20 +84,21 @@ export function CorrectionDialog({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150"
+      aria-labelledby="correction-dialog-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150 backdrop-blur-xs"
     >
-      <div className="w-full max-w-md rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm space-y-4">
+      <div className="w-full max-w-md rounded-2xl border-[1.5px] border-[#0F172A] bg-white p-6 shadow-[3px_3px_0px_0px_#0F172A] space-y-5 text-[#0F172A]">
         {/* Header */}
-        <div className="flex items-center justify-between pb-2 border-b border-[var(--color-border)]">
-          <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)]">
+        <div className="flex items-center justify-between pb-3 border-b border-[#E5DFD5]">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-lg border-[1.5px] border-[#0F172A] bg-[#FAF7F2] text-[#0F172A] shadow-[1.5px_1.5px_0px_0px_#0F172A]">
               <Clock className="size-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-[var(--color-text)]">
+              <h2 id="correction-dialog-title" className="font-display text-base font-bold text-[#0F172A]">
                 Request Time Correction
               </h2>
-              <p className="text-[11px] text-[var(--color-muted)]">
+              <p className="text-xs text-slate-500 font-medium truncate max-w-[240px]">
                 {log.taskTitle}
               </p>
             </div>
@@ -98,38 +106,34 @@ export function CorrectionDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-[var(--color-muted)] hover:text-[var(--color-text)] cursor-pointer"
+            aria-label="Close dialog"
+            className="rounded-lg p-1.5 text-slate-500 hover:text-[#0F172A] hover:bg-[#FAF7F2] border border-transparent hover:border-[#0F172A]/20 transition-all cursor-pointer"
           >
             <X className="size-4" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {serverError && (
-            <div className="flex items-start gap-2 rounded-md border border-[var(--color-conflict)] bg-[var(--color-conflict-bg)] p-2.5 text-xs text-[var(--color-conflict)]">
-              <AlertCircle className="size-4 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2.5 rounded-xl border-[1.5px] border-[#DC2626] bg-[#FEF2F2] p-3 text-xs text-[#991B1B] shadow-[2px_2px_0px_0px_#DC2626]">
+              <AlertCircle className="size-4 shrink-0 mt-0.5 text-[#DC2626]" />
               <span>{serverError}</span>
             </div>
           )}
 
-          <div className="rounded border border-[var(--color-border)] bg-[var(--color-bg)] p-2.5 text-xs space-y-1">
-            <span className="text-[11px] text-[var(--color-muted)] block">Original Time In:</span>
-            <span className="font-medium text-[var(--color-text)]">
-              {new Date(log.timeIn).toLocaleString("en-US", {
-                timeZone: "Asia/Manila",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true,
-              })}
+          <div className="rounded-xl border-[1.5px] border-[#0F172A]/30 bg-[#FAF7F2] p-3 text-xs space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+              Original Time In
+            </span>
+            <span className="font-bold text-[#0F172A] text-sm">
+              {formatDateTime(log.timeIn)}
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="corr-date" className="text-xs font-medium text-[var(--color-text)]">
+            <div className="space-y-1.5">
+              <Label htmlFor="corr-date" className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Correct Date
               </Label>
               <Input
@@ -138,13 +142,13 @@ export function CorrectionDialog({
                 value={dateStr}
                 onChange={(e) => setDateStr(e.target.value)}
                 disabled={isSubmitting}
-                className="bg-[var(--color-bg)] text-xs h-8"
+                className="h-10 text-xs bg-white border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A]"
                 required
               />
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="corr-time" className="text-xs font-medium text-[var(--color-text)]">
+            <div className="space-y-1.5">
+              <Label htmlFor="corr-time" className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Correct Time Out
               </Label>
               <Input
@@ -153,14 +157,14 @@ export function CorrectionDialog({
                 value={timeStr}
                 onChange={(e) => setTimeStr(e.target.value)}
                 disabled={isSubmitting}
-                className="bg-[var(--color-bg)] text-xs h-8"
+                className="h-10 text-xs bg-white border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A]"
                 required
               />
             </div>
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="corr-note" className="text-xs font-medium text-[var(--color-text)]">
+          <div className="space-y-1.5">
+            <Label htmlFor="corr-note" className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Explanation for Client
             </Label>
             <textarea
@@ -170,27 +174,27 @@ export function CorrectionDialog({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               disabled={isSubmitting}
-              className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-xs text-[var(--color-text)] focus:border-[var(--color-accent)] outline-none"
+              className="w-full rounded-lg border-[1.5px] border-[#0F172A] bg-white p-3 text-xs text-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A] transition-all resize-none"
               maxLength={300}
               required
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--color-border)]">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E5DFD5]">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={onClose}
               disabled={isSubmitting}
-              className="text-xs cursor-pointer h-8"
+              className="text-xs cursor-pointer h-9 px-4 font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A]"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting || !note.trim()}
-              className="bg-[var(--color-accent)] text-[var(--color-accent-fg)] hover:bg-[var(--color-accent-hover)] text-xs cursor-pointer h-8"
+              className="bg-[#0F172A] hover:bg-slate-800 text-white text-xs cursor-pointer h-9 px-5 font-bold border-[1.5px] border-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#0F172A] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
             >
               {isSubmitting ? (
                 <span className="flex items-center gap-1.5">
@@ -207,4 +211,3 @@ export function CorrectionDialog({
     </div>
   );
 }
-

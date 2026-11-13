@@ -5,8 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Role } from "@prisma/client";
 import { logoutAction } from "@/lib/actions/auth";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/lib/labels";
 import {
   Bell,
   User,
@@ -38,7 +37,6 @@ export function AppTopbar({ user, unreadCount = 0 }: AppTopbarProps) {
   const profileUrl = isStudent ? "/student/profile" : "/client/profile";
 
   const isNotificationsActive = pathname.startsWith(notificationsUrl);
-  const isProfileActive = pathname.startsWith(profileUrl);
 
   // Close menu on click outside
   React.useEffect(() => {
@@ -52,78 +50,88 @@ export function AppTopbar({ user, unreadCount = 0 }: AppTopbarProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-bg)] px-4 md:px-6">
-      {/* Left: Brand & Role */}
-      <div className="flex items-center gap-3">
+    <header
+      style={{ height: "var(--header-h)" }}
+      className="sticky top-0 z-30 flex h-[var(--header-h)] w-full items-center justify-between border-b border-[#E5DFD5] bg-[#FAF7F2]/95 backdrop-blur-md px-3 sm:px-6 shrink-0"
+    >
+      {/* Left: Brand Logo (never pushes controls off-screen) */}
+      <div className="flex items-center min-w-0 shrink">
         <Link
           href={isStudent ? "/student" : "/client"}
-          className="flex items-center gap-2 text-sm font-semibold tracking-tight text-[var(--color-text)] hover:opacity-90"
+          className="group flex items-center gap-2 sm:gap-2.5 rounded-lg p-1 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A]"
+          aria-label="Student VA-Hub Dashboard"
         >
-          <span className="flex size-7 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)]">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#0F172A] text-white shadow-[2px_2px_0px_0px_#0F172A] transition-transform group-hover:-translate-y-0.5">
             {isStudent ? (
-              <GraduationCap className="size-4" />
+              <GraduationCap className="size-4 shrink-0" />
             ) : (
-              <Briefcase className="size-4" />
+              <Briefcase className="size-4 shrink-0" />
             )}
+          </div>
+          <span className="font-display font-extrabold text-xs sm:text-base tracking-tight text-[#0F172A] truncate">
+            Student VA-Hub
           </span>
-          <span className="hidden sm:inline font-semibold">Student VA-Hub</span>
         </Link>
-        <span className="hidden sm:inline text-xs text-[var(--color-muted)] font-mono">
-          /
-        </span>
-        <Badge
-          variant="secondary"
-          className="rounded px-2 py-0.5 text-[11px] font-medium"
-        >
-          {isStudent ? "Student VA" : "Client"}
-        </Badge>
       </div>
 
-      {/* Right: Notifications & Profile Menu */}
-      <div className="flex items-center gap-2">
+      {/* Right: Notifications & Profile Menu — always visible on one row */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Bell (Notifications) */}
         <Link
           href={notificationsUrl}
           title="Notifications"
-          className={`relative flex size-8 items-center justify-center rounded-md border text-xs font-medium transition-colors ${
-            isNotificationsActive
-              ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-fg)]"
-              : "border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]"
-          }`}
+          aria-label={
+            unreadCount > 0
+              ? `Notifications, ${unreadCount} unread`
+              : "Notifications"
+          }
+          className={`relative flex size-8 sm:size-9 shrink-0 items-center justify-center rounded-lg border-[1.5px] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A] ${isNotificationsActive
+              ? "border-[#0F172A] bg-[#0F172A] text-white shadow-[2px_2px_0px_0px_#0F172A]"
+              : "border-[#0F172A] bg-white text-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-[#FAF7F2] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+            }`}
         >
-          <Bell className="size-4" />
+          <Bell className="size-4 shrink-0" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex size-3 items-center justify-center rounded-full bg-[var(--color-conflict)] ring-2 ring-[var(--color-bg)]" />
+            <span
+              data-testid="bell-badge"
+              aria-hidden="true"
+              className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 px-1 items-center justify-center rounded-full text-[10px] font-bold font-mono shadow-xs ${isNotificationsActive
+                  ? "bg-white text-[#0F172A] border-[1px] border-[#0F172A]"
+                  : "bg-[#0F172A] text-white ring-2 ring-white"
+                }`}
+            >
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
           )}
         </Link>
 
-        {/* Profile Menu Dropdown */}
-        <div className="relative" ref={menuRef}>
+        {/* Profile Menu Dropdown with Role Label inside */}
+        <div className="relative shrink-0" ref={menuRef}>
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-              isProfileActive || menuOpen
-                ? "border-[var(--color-accent)] bg-[var(--color-surface)] text-[var(--color-text)]"
-                : "border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] hover:bg-[var(--color-surface)]"
-            }`}
+            className={`flex items-center gap-1.5 sm:gap-2 rounded-lg border-[1.5px] border-[#0F172A] bg-white px-2 py-1.5 sm:px-3 text-xs font-bold text-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A] hover:bg-[#FAF7F2] transition-all cursor-pointer shrink-0 ${menuOpen ? "bg-[#FAF7F2]" : ""
+              }`}
           >
-            <div className="flex size-5 items-center justify-center rounded-full bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-[10px]">
+            <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#0F172A] text-white text-[10px] font-bold">
               {user.name ? user.name.charAt(0).toUpperCase() : "U"}
             </div>
-            <span className="max-w-[120px] truncate text-xs font-medium">
+            <span className="max-w-[70px] sm:max-w-[120px] truncate text-xs">
               {user.name ?? "Account"}
             </span>
-            <ChevronDown className="size-3.5 text-[var(--color-muted)]" />
+            <ChevronDown className="size-3.5 shrink-0 text-slate-500" />
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 mt-1 w-56 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1.5 shadow-sm z-50">
-              <div className="px-2 py-1.5 border-b border-[var(--color-border)] mb-1">
-                <p className="text-xs font-semibold text-[var(--color-text)] truncate">
-                  {user.name}
-                </p>
-                <p className="text-[11px] text-[var(--color-muted)] truncate">
+            <div className="absolute right-0 mt-2 w-64 rounded-xl border-[1.5px] border-[#0F172A] bg-white p-2 shadow-[4px_4px_0px_0px_#0F172A] z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="px-3 py-2 border-b border-[#E5DFD5] mb-1.5 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold text-[#0F172A] truncate">
+                    {user.name}
+                  </p>
+                  <StatusBadge status={user.role} className="text-[10px] px-2 py-0.5" />
+                </div>
+                <p className="text-[11px] text-slate-500 truncate">
                   {user.email}
                 </p>
               </div>
@@ -131,18 +139,18 @@ export function AppTopbar({ user, unreadCount = 0 }: AppTopbarProps) {
               <Link
                 href={profileUrl}
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-xs text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors"
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:text-[#0F172A] hover:bg-[#FAF7F2] transition-colors"
               >
-                <User className="size-3.5 text-[var(--color-muted)]" />
+                <User className="size-4 text-slate-500" />
                 <span>Profile and Settings</span>
               </Link>
 
-              <form action={logoutAction} className="w-full mt-1 pt-1 border-t border-[var(--color-border)]">
+              <form action={logoutAction} className="w-full mt-1.5 pt-1.5 border-t border-[#E5DFD5]">
                 <button
                   type="submit"
-                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs text-[var(--color-conflict)] hover:bg-[var(--color-conflict-bg)] transition-colors cursor-pointer"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-bold text-[#DC2626] hover:bg-[#FEF2F2] transition-colors cursor-pointer"
                 >
-                  <LogOut className="size-3.5" />
+                  <LogOut className="size-4" />
                   <span>Log out</span>
                 </button>
               </form>
@@ -153,4 +161,3 @@ export function AppTopbar({ user, unreadCount = 0 }: AppTopbarProps) {
     </header>
   );
 }
-

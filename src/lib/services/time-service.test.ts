@@ -6,8 +6,9 @@ import {
   requestCorrection,
   getStudentTimeData,
 } from "./time-service";
+import { calculateLogAmount } from "../money";
 import { prisma } from "../prisma";
-import { TimeLogStatus, TaskStatus } from "@prisma/client";
+import { TimeLogStatus, TaskStatus, StudentResponse } from "@prisma/client";
 
 describe("time-service", () => {
   let studentId: string;
@@ -43,6 +44,7 @@ describe("time-service", () => {
         dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
         estHours: 2,
         status: TaskStatus.TODO,
+        studentResponse: StudentResponse.ACCEPTED,
       },
     });
     testTaskId = task.id;
@@ -75,9 +77,9 @@ describe("time-service", () => {
       const hours = calculateLoggedHours(tIn, tOut);
       expect(hours).toBe(3.0);
 
-      // At P150/hr: 3 hours * 150 = 450
+      // At P150/hr: 3 hours @ 150 = 450
       const rate = 150;
-      expect(hours * rate).toBe(450);
+      expect(calculateLogAmount(hours, rate)).toBe(450);
     });
 
     it("computes fractional hours correctly (e.g. 1.5h, 0.75h)", () => {
@@ -139,7 +141,136 @@ describe("time-service", () => {
         orderBy: { createdAt: "desc" },
       });
       expect(notif).not.toBeNull();
-      expect(notif?.message).toContain("requested time correction");
+      expect(notif?.message).toContain("requested a time correction");
+    });
+
+    it("rejects correction requests for an open log", async () => {
+      const log = await timeIn(studentId, testTaskId);
+      createdLogIds.push(log.id);
+
+      await expect(
+        requestCorrection(studentId, {
+          timeLogId: log.id,
+          requestedTimeOut: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          correctionNote: "This request should not be accepted yet.",
+        }),
+      ).rejects.toThrow("Only a closed time log can be corrected");
+
+      await timeOut(studentId, log.id);
+    });
+  });
+
+  describe("Acceptance requirement before Time In (Business Rule)", () => {
+    it("rejects Time In on a task with null studentResponse", async () => {
+      const nullTask = await prisma.task.create({
+        data: {
+          clientId,
+          studentId,
+          title: "Unaccepted Task",
+          startAt: new Date(),
+          dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+          estHours: 1,
+          status: TaskStatus.TODO,
+          studentResponse: null,
+        },
+      });
+
+      await expect(timeIn(studentId, nullTask.id)).rejects.toThrow(
+        "Accept this task before you start the timer."
+      );
+
+      await prisma.task.delete({ where: { id: nullTask.id } });
+    });
+
+    it("rejects Time In on a task with RESCHEDULE_REQUESTED", async () => {
+      const rescheduleTask = await prisma.task.create({
+        data: {
+          clientId,
+          studentId,
+          title: "Reschedule Task",
+          startAt: new Date(),
+          dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+          estHours: 1,
+          status: TaskStatus.TODO,
+          studentResponse: StudentResponse.RESCHEDULE_REQUESTED,
+          rescheduleReason: "Doctor appointment",
+        },
+      });
+
+      await expect(timeIn(studentId, rescheduleTask.id)).rejects.toThrow(
+        "Accept this task before you start the timer."
+      );
+
+      await prisma.task.delete({ where: { id: rescheduleTask.id } });
+    });
+
+    it("rejects Time In on a completed task (status === DONE)", async () => {
+      const doneTask = await prisma.task.create({
+        data: {
+          clientId,
+          studentId,
+          title: "Completed Task",
+          startAt: new Date(),
+          dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+          estHours: 1,
+          status: TaskStatus.DONE,
+          studentResponse: StudentResponse.ACCEPTED,
+        },
+      });
+
+      await expect(timeIn(studentId, doneTask.id)).rejects.toThrow(
+        "Cannot track time on a completed task."
+      );
+
+      await prisma.task.delete({ where: { id: doneTask.id } });
+    });
+
+    it("allows Time In on an ACCEPTED task and transitions status from TODO to DOING", async () => {
+      const acceptedTask = await prisma.task.create({
+        data: {
+          clientId,
+          studentId,
+          title: "Accepted Task",
+          startAt: new Date(),
+          dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+          estHours: 1,
+          status: TaskStatus.TODO,
+          studentResponse: StudentResponse.ACCEPTED,
+        },
+      });
+
+      const log = await timeIn(studentId, acceptedTask.id);
+      expect(log.status).toBe(TimeLogStatus.OPEN);
+      createdLogIds.push(log.id);
+
+      const updatedTask = await prisma.task.findUnique({ where: { id: acceptedTask.id } });
+      expect(updatedTask?.status).toBe(TaskStatus.DOING);
+
+      await timeOut(studentId, log.id);
+      await prisma.timeLog.deleteMany({ where: { taskId: acceptedTask.id } });
+      await prisma.task.delete({ where: { id: acceptedTask.id } });
+    });
+
+    it("only returns ACCEPTED and not-done tasks in availableTasks", async () => {
+      const nullTask = await prisma.task.create({
+        data: {
+          clientId,
+          studentId,
+          title: "Unaccepted Helper Task",
+          startAt: new Date(),
+          dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+          estHours: 1,
+          status: TaskStatus.TODO,
+          studentResponse: null,
+        },
+      });
+
+      const data = await getStudentTimeData(studentId);
+      const ids = data.availableTasks.map((t) => t.id);
+      expect(ids).toContain(testTaskId);
+      expect(ids).not.toContain(nullTask.id);
+
+      await prisma.task.delete({ where: { id: nullTask.id } });
     });
   });
 
@@ -161,4 +292,3 @@ describe("time-service", () => {
     });
   });
 });
-

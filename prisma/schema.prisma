@@ -189,6 +189,7 @@ model Task {
   startAt         DateTime         // UTC
   dueAt           DateTime         // UTC
   estHours        Float
+  hoursWarning    Boolean          @default(false)
   status          TaskStatus       @default(TODO)
   studentResponse StudentResponse?
   rescheduleReason String?

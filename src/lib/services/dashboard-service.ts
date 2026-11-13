@@ -1,7 +1,10 @@
 import { prisma } from "../prisma";
 import { toManilaTimeComponents } from "../conflict";
 import { minutesToTimeString, DAYS_MAP } from "../schedule-utils";
-import { TaskStatus, TimeLogStatus } from "@prisma/client";
+import { TaskStatus, TimeLogStatus, StudentResponse, CorrectionStatus } from "@prisma/client";
+import { calculateLogAmount, sumMoney } from "../money";
+import { getNextFreeWindow } from "../open-slots";
+import { formatDate } from "../format";
 
 const MANILA_TIMEZONE_OFFSET_MS = 8 * 60 * 60 * 1000;
 
@@ -86,25 +89,46 @@ export interface ClientDashboardData {
     state: "IN_CLASS" | "AVAILABLE" | "OFF";
     label: string;
     description: string;
+    untilTime?: string | null;
   };
+  nextFreeWindow?: {
+    dateKey: string;
+    startTime: string;
+    endTime: string;
+    formatted: string;
+  } | null;
   tasksSummary: {
     todoCount: number;
     doingCount: number;
     doneCount: number;
+    rescheduleRequestCount: number;
     activeTasks: {
       id: string;
       title: string;
       dueAt: Date;
       estHours: number;
       status: TaskStatus;
+      studentResponse?: StudentResponse | null;
       loggedHours: number;
     }[];
   };
   pendingApproval: {
     logCount: number;
+    correctionCount: number;
     totalHours: number;
     totalAmount: number;
   };
+  attention: {
+    rescheduleRequestsCount: number;
+    correctionRequestsCount: number;
+  };
+  recentNotifications: {
+    id: string;
+    type: string;
+    message: string;
+    readAt: Date | null;
+    createdAt: Date;
+  }[];
 }
 
 /**
@@ -118,6 +142,7 @@ export function determineStudentLiveStatus(
   state: "IN_CLASS" | "AVAILABLE" | "OFF";
   label: string;
   description: string;
+  untilTime?: string | null;
 } {
   // 1. Check if currently in class
   const activeClass = classesToday.find(
@@ -128,6 +153,7 @@ export function determineStudentLiveStatus(
       state: "IN_CLASS",
       label: "Currently in class",
       description: `Class ends at ${minutesToTimeString(activeClass.endMinutes)}`,
+      untilTime: minutesToTimeString(activeClass.endMinutes),
     };
   }
 
@@ -140,6 +166,7 @@ export function determineStudentLiveStatus(
       state: "AVAILABLE",
       label: "Available for VA work",
       description: `Available until ${minutesToTimeString(activeAvail.endMinutes)}`,
+      untilTime: minutesToTimeString(activeAvail.endMinutes),
     };
   }
 
@@ -151,6 +178,7 @@ export function determineStudentLiveStatus(
     description: nextAvail
       ? `Next available at ${minutesToTimeString(nextAvail.startMinutes)}`
       : "No more availability slots today",
+    untilTime: null,
   };
 }
 
@@ -243,6 +271,7 @@ export async function getStudentDashboardData(studentId: string): Promise<Studen
   const oneWeekAgoMs = now.getTime() - 7 * 24 * 60 * 60 * 1000;
   let hoursToday = 0;
   let hoursThisWeek = 0;
+  const thisWeekLogs: { totalHours: number }[] = [];
 
   for (const log of allTimeLogs) {
     if (log.totalHours && log.totalHours > 0) {
@@ -252,12 +281,13 @@ export async function getStudentDashboardData(studentId: string): Promise<Studen
       }
       if (log.timeIn.getTime() >= oneWeekAgoMs) {
         hoursThisWeek += log.totalHours;
+        thisWeekLogs.push({ totalHours: log.totalHours });
       }
     }
   }
 
-  hoursToday = Math.round(hoursToday * 100) / 100;
-  hoursThisWeek = Math.round(hoursThisWeek * 100) / 100;
+  hoursToday = Math.round(hoursToday * 60) / 60;
+  hoursThisWeek = Math.round(hoursThisWeek * 60) / 60;
 
   const capacityPercentage = Math.min(100, Math.round((hoursToday / maxHoursPerDay) * 100));
   const remainingHoursToday = Math.max(0, Math.round((maxHoursPerDay - hoursToday) * 100) / 100);
@@ -273,12 +303,12 @@ export async function getStudentDashboardData(studentId: string): Promise<Studen
 
   const nextTask = nextTaskRaw
     ? {
-        id: nextTaskRaw.id,
-        title: nextTaskRaw.title,
-        dueAt: nextTaskRaw.dueAt,
-        estHours: nextTaskRaw.estHours,
-        status: nextTaskRaw.status,
-      }
+      id: nextTaskRaw.id,
+      title: nextTaskRaw.title,
+      dueAt: nextTaskRaw.dueAt,
+      estHours: nextTaskRaw.estHours,
+      status: nextTaskRaw.status,
+    }
     : null;
 
   return {
@@ -293,11 +323,11 @@ export async function getStudentDashboardData(studentId: string): Promise<Studen
     },
     linkedClient: link
       ? {
-          id: link.client.id,
-          name: link.client.name,
-          email: link.client.email,
-          hourlyRate: link.hourlyRate,
-        }
+        id: link.client.id,
+        name: link.client.name,
+        email: link.client.email,
+        hourlyRate: link.hourlyRate,
+      }
       : null,
     todayInfo: {
       dateKey,
@@ -316,11 +346,11 @@ export async function getStudentDashboardData(studentId: string): Promise<Studen
     nextClass,
     activeTimer: activeTimeLog
       ? {
-          id: activeTimeLog.id,
-          taskId: activeTimeLog.taskId,
-          taskTitle: activeTimeLog.task.title,
-          timeIn: activeTimeLog.timeIn,
-        }
+        id: activeTimeLog.id,
+        taskId: activeTimeLog.taskId,
+        taskTitle: activeTimeLog.task.title,
+        timeIn: activeTimeLog.timeIn,
+      }
       : null,
     tasksSummary: {
       todoCount,
@@ -329,7 +359,7 @@ export async function getStudentDashboardData(studentId: string): Promise<Studen
     },
     weeklyEarnings: {
       hoursThisWeek,
-      estimatedAmount: Math.round(hoursThisWeek * hourlyRate * 100) / 100,
+      estimatedAmount: sumMoney(thisWeekLogs.map((l) => calculateLogAmount(l.totalHours, hourlyRate))),
       hourlyRate,
     },
   };
@@ -351,24 +381,38 @@ export async function getClientDashboardData(clientId: string): Promise<ClientDa
   });
 
   if (!link || !link.student) {
+    const recentNotifications = await prisma.notification.findMany({
+      where: { userId: clientId },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    });
+
     return {
       linked: false,
       studentStatus: {
         state: "OFF",
-        label: "No linked student",
-        description: "Link a student VA to see live status and tasks.",
+        label: "Not available",
+        description: "No student linked yet.",
+        untilTime: null,
       },
       tasksSummary: {
         todoCount: 0,
         doingCount: 0,
         doneCount: 0,
+        rescheduleRequestCount: 0,
         activeTasks: [],
       },
       pendingApproval: {
         logCount: 0,
+        correctionCount: 0,
         totalHours: 0,
         totalAmount: 0,
       },
+      attention: {
+        rescheduleRequestsCount: 0,
+        correctionRequestsCount: 0,
+      },
+      recentNotifications,
     };
   }
 
@@ -382,8 +426,17 @@ export async function getClientDashboardData(clientId: string): Promise<ClientDa
   const currentMinutes = manilaNow.minutesFromMidnight;
   const dayOfWeek = manilaNow.dayOfWeek;
 
-  // Concurrently fetch today's student classes, availabilities, client's tasks, and pending time logs
-  const [classesTodayRaw, availabilitiesTodayRaw, tasks, pendingLogs] = await Promise.all([
+  // Concurrently fetch today's student classes, availabilities, weekly schedules for next free window, client's tasks, pending time logs, and recent notifications
+  const [
+    classesTodayRaw,
+    availabilitiesTodayRaw,
+    allClassesRaw,
+    allAvailabilitiesRaw,
+    allBlockedDatesRaw,
+    tasks,
+    pendingLogs,
+    recentNotifications,
+  ] = await Promise.all([
     prisma.classSchedule.findMany({
       where: { studentId: student.id, dayOfWeek },
       select: { startMinutes: true, endMinutes: true },
@@ -391,6 +444,18 @@ export async function getClientDashboardData(clientId: string): Promise<ClientDa
     prisma.availability.findMany({
       where: { studentId: student.id, dayOfWeek },
       select: { startMinutes: true, endMinutes: true },
+    }),
+    prisma.classSchedule.findMany({
+      where: { studentId: student.id },
+      select: { dayOfWeek: true, startMinutes: true, endMinutes: true },
+    }),
+    prisma.availability.findMany({
+      where: { studentId: student.id },
+      select: { dayOfWeek: true, startMinutes: true, endMinutes: true },
+    }),
+    prisma.blockedDate.findMany({
+      where: { studentId: student.id },
+      select: { dateStart: true, dateEnd: true },
     }),
     prisma.task.findMany({
       where: { clientId, studentId: student.id },
@@ -410,7 +475,13 @@ export async function getClientDashboardData(clientId: string): Promise<ClientDa
       select: {
         id: true,
         totalHours: true,
+        correctionStatus: true,
       },
+    }),
+    prisma.notification.findMany({
+      where: { userId: clientId },
+      orderBy: { createdAt: "desc" },
+      take: 6,
     }),
   ]);
 
@@ -421,10 +492,49 @@ export async function getClientDashboardData(clientId: string): Promise<ClientDa
     currentMinutes
   );
 
+  // Compute next free window
+  const nextSlot = getNextFreeWindow({
+    classes: allClassesRaw,
+    availability: allAvailabilitiesRaw,
+    blockedDates: allBlockedDatesRaw,
+    existingTasks: tasks.map((t) => ({
+      id: t.id,
+      startAt: t.startAt,
+      dueAt: t.dueAt,
+      estHours: t.estHours,
+      status: t.status,
+    })),
+    now,
+  });
+
+  let nextFreeWindow: ClientDashboardData["nextFreeWindow"] = null;
+  if (nextSlot) {
+    const sComp = toManilaTimeComponents(nextSlot.start);
+    const eComp = toManilaTimeComponents(nextSlot.end);
+    const dateFormatted = formatDate(nextSlot.start, "EEE, MMM d");
+    const timeFormatted = `${minutesToTimeString(
+      sComp.minutesFromMidnight
+    )} – ${minutesToTimeString(eComp.minutesFromMidnight)}`;
+    nextFreeWindow = {
+      dateKey: sComp.dateKey,
+      startTime: minutesToTimeString(sComp.minutesFromMidnight, true),
+      endTime: minutesToTimeString(eComp.minutesFromMidnight, true),
+      formatted: `${dateFormatted} · ${timeFormatted}`,
+    };
+  }
+
   // Task statistics
   const todoCount = tasks.filter((t) => t.status === TaskStatus.TODO).length;
   const doingCount = tasks.filter((t) => t.status === TaskStatus.DOING).length;
   const doneCount = tasks.filter((t) => t.status === TaskStatus.DONE).length;
+
+  const rescheduleRequestsCount = tasks.filter(
+    (t) => t.studentResponse === StudentResponse.RESCHEDULE_REQUESTED
+  ).length;
+
+  const correctionRequestsCount = pendingLogs.filter(
+    (l) => l.correctionStatus === CorrectionStatus.PENDING
+  ).length;
 
   const activeTasks = tasks
     .filter((t) => t.status === TaskStatus.DOING || t.status === TaskStatus.TODO)
@@ -437,6 +547,7 @@ export async function getClientDashboardData(clientId: string): Promise<ClientDa
         dueAt: t.dueAt,
         estHours: t.estHours,
         status: t.status,
+        studentResponse: t.studentResponse,
         loggedHours: Math.round(loggedHours * 100) / 100,
       };
     });
@@ -445,8 +556,9 @@ export async function getClientDashboardData(clientId: string): Promise<ClientDa
   const pendingHoursTotal = pendingLogs.reduce((acc, l) => acc + (l.totalHours ?? 0), 0);
   const pendingApproval = {
     logCount: pendingLogs.length,
-    totalHours: Math.round(pendingHoursTotal * 100) / 100,
-    totalAmount: Math.round(pendingHoursTotal * hourlyRate * 100) / 100,
+    correctionCount: correctionRequestsCount,
+    totalHours: Math.round(pendingHoursTotal * 60) / 60,
+    totalAmount: sumMoney(pendingLogs.map((l) => calculateLogAmount(l.totalHours, hourlyRate))),
   };
 
   return {
@@ -462,13 +574,20 @@ export async function getClientDashboardData(clientId: string): Promise<ClientDa
       maxHoursPerDay: studentProfile?.maxHoursPerDay ?? 4,
     },
     studentStatus,
+    nextFreeWindow,
     tasksSummary: {
       todoCount,
       doingCount,
       doneCount,
+      rescheduleRequestCount: rescheduleRequestsCount,
       activeTasks,
     },
     pendingApproval,
+    attention: {
+      rescheduleRequestsCount,
+      correctionRequestsCount,
+    },
+    recentNotifications,
   };
 }
 

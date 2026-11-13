@@ -1,11 +1,14 @@
 import { prisma } from "../prisma";
 import { toManilaTimeComponents } from "../conflict";
 import { DAYS_MAP, minutesToTimeString } from "../schedule-utils";
+import { getOpenSlots, getNextFreeWindow } from "../open-slots";
+import { determineStudentLiveStatus } from "./dashboard-service";
+import { formatDate, formatHours } from "../format";
 import type { TaskStatus } from "@prisma/client";
 
 export interface CalendarEventItem {
   id: string;
-  type: "CLASS" | "AVAILABILITY" | "TASK";
+  type: "CLASS" | "AVAILABILITY" | "TASK" | "OPEN_SLOT";
   title: string;
   dayOfWeek: number;
   startMinutes: number;
@@ -16,6 +19,8 @@ export interface CalendarEventItem {
   taskId?: string;
   taskStatus?: TaskStatus;
   estHours?: number;
+  minutes?: number;
+  isPast?: boolean;
 }
 
 export interface CalendarDayData {
@@ -25,10 +30,13 @@ export interface CalendarDayData {
   dateKey: string; // YYYY-MM-DD
   formattedDate: string; // e.g. "Nov 11"
   isToday: boolean;
+  isPast: boolean;
   isBlocked: boolean;
-  blockedReason?: string | null;
+  freeHoursFormatted: string;
+  freeMinutes: number;
   classes: CalendarEventItem[];
   availabilities: CalendarEventItem[];
+  openSlots: CalendarEventItem[];
   tasks: CalendarEventItem[];
 }
 
@@ -44,11 +52,25 @@ export interface ClientCalendarData {
     hourlyRate: number;
     maxHoursPerDay: number;
   };
+  studentLiveStatus?: {
+    state: "IN_CLASS" | "AVAILABLE" | "OFF";
+    label: string;
+    description: string;
+    untilTime?: string | null;
+  };
+  nextFreeWindow?: {
+    dateKey: string;
+    startTime: string;
+    endTime: string;
+    formatted: string;
+  } | null;
   weekStartKey: string; // YYYY-MM-DD (Monday)
   weekEndKey: string;   // YYYY-MM-DD (Sunday)
   weekLabel: string;    // e.g. "Nov 9 – Nov 15, 2026"
   prevWeekKey: string;  // YYYY-MM-DD of previous Monday
   nextWeekKey: string;  // YYYY-MM-DD of next Monday
+  currentMinutes: number;
+  hasAnyFreeTime?: boolean;
   days: CalendarDayData[];
 }
 
@@ -154,7 +176,9 @@ export function getManilaWeekDates(anchorDateInput: Date | string = new Date()):
 
 /**
  * Retrieves client calendar schedule data for their linked student.
- * CRITICAL PRIVACY: Class schedules NEVER expose subject names, strictly returning "In class".
+ * CRITICAL PRIVACY:
+ * - Class schedules NEVER expose subject names, strictly returning "In class".
+ * - Blocked dates NEVER expose reason, strictly returning isBlocked: true.
  */
 export async function getClientCalendarData(
   clientId: string,
@@ -171,6 +195,11 @@ export async function getClientCalendarData(
     },
   });
 
+  const now = new Date();
+  const nowMs = now.getTime();
+  const todayComponents = toManilaTimeComponents(now);
+  const currentMinutes = todayComponents.minutesFromMidnight;
+
   if (!link || !link.student) {
     return {
       linked: false,
@@ -179,6 +208,7 @@ export async function getClientCalendarData(
       weekLabel: "",
       prevWeekKey: "",
       nextWeekKey: "",
+      currentMinutes,
       days: [],
     };
   }
@@ -198,8 +228,9 @@ export async function getClientCalendarData(
   } = getManilaWeekDates(anchorDateInput);
 
   // Fetch classes, availabilities, blocked dates, and tasks concurrently
+  // PRIVACY: Strictly select only id, dayOfWeek, startMinutes, endMinutes (no subject!)
+  // PRIVACY: Strictly select only id, studentId, dateStart, dateEnd (no reason!)
   const [classesRaw, availabilitiesRaw, blockedDatesRaw, tasksRaw] = await Promise.all([
-    // Student classes - Privacy: do not query subject or replace it strictly
     prisma.classSchedule.findMany({
       where: { studentId: student.id },
       select: {
@@ -226,6 +257,12 @@ export async function getClientCalendarData(
         dateStart: { lte: weekEndUtc },
         dateEnd: { gte: weekStartUtc },
       },
+      select: {
+        id: true,
+        studentId: true,
+        dateStart: true,
+        dateEnd: true,
+      },
     }),
     prisma.task.findMany({
       where: {
@@ -246,7 +283,53 @@ export async function getClientCalendarData(
     }),
   ]);
 
-  // Construct week label (e.g. "Nov 9 – Nov 15, 2026")
+  // Compute live student status for today
+  const todayClasses = classesRaw.filter((c) => c.dayOfWeek === todayComponents.dayOfWeek);
+  const todayAvailabilities = availabilitiesRaw.filter((a) => a.dayOfWeek === todayComponents.dayOfWeek);
+  const studentLiveStatus = determineStudentLiveStatus(
+    todayClasses,
+    todayAvailabilities,
+    currentMinutes
+  );
+
+  // Compute open slots across the visible week
+  const weekOpenSlots = getOpenSlots({
+    from: weekStartUtc,
+    to: weekEndUtc,
+    classes: classesRaw,
+    availability: availabilitiesRaw,
+    blockedDates: blockedDatesRaw,
+    existingTasks: tasksRaw,
+    now: weekStartUtc, // Calculate slots across the whole visible week so past ones can be dimmed
+  });
+
+  // Calculate next free window from now
+  const nextSlot = getNextFreeWindow({
+    classes: classesRaw,
+    availability: availabilitiesRaw,
+    blockedDates: blockedDatesRaw,
+    existingTasks: tasksRaw,
+    now,
+  });
+
+  let nextFreeWindow: ClientCalendarData["nextFreeWindow"] = null;
+  if (nextSlot) {
+    const nextStartComp = toManilaTimeComponents(nextSlot.start);
+    const nextEndComp = toManilaTimeComponents(nextSlot.end);
+    const dateFormatted = formatDate(nextSlot.start, "EEE, MMM d");
+    const timeRangeFormatted = `${minutesToTimeString(
+      nextStartComp.minutesFromMidnight
+    )} – ${minutesToTimeString(nextEndComp.minutesFromMidnight)}`;
+
+    nextFreeWindow = {
+      dateKey: nextStartComp.dateKey,
+      startTime: minutesToTimeString(nextStartComp.minutesFromMidnight, true),
+      endTime: minutesToTimeString(nextEndComp.minutesFromMidnight, true),
+      formatted: `${dateFormatted} · ${timeRangeFormatted}`,
+    };
+  }
+
+  // Construct week label (e.g. "Nov 9 – 15, 2026")
   const firstDayFormatted = weekDays[0].formattedDate;
   const lastDayFormatted = weekDays[6].formattedDate;
   const [endYear] = weekEndKey.split("-");
@@ -258,66 +341,117 @@ export async function getClientCalendarData(
     const dayNameInfo = DAYS_MAP[dayOfWeek] ?? { name: "Day", shortName: "Day" };
     const dateKey = dayInfo.dateKey;
     const isToday = dateKey === todayKey;
+    const isPastDay = dateKey < todayKey;
 
     // Check if this date is blocked
     const dayStartUtc = new Date(`${dateKey}T00:00:00.000Z`);
     const dayEndUtc = new Date(`${dateKey}T23:59:59.999Z`);
-    const matchedBlocked = blockedDatesRaw.find(
+    const isBlocked = blockedDatesRaw.some(
       (b) => b.dateStart <= dayEndUtc && b.dateEnd >= dayStartUtc
     );
 
     // Classes for this day of week (strictly "In class")
-    const dayClasses: CalendarEventItem[] = classesRaw
-      .filter((c) => c.dayOfWeek === dayOfWeek)
-      .map((c) => ({
-        id: c.id,
-        type: "CLASS",
-        title: "In class", // SPEC §6, §10 Scenario 6: Strictly redacted
-        dayOfWeek: c.dayOfWeek,
-        startMinutes: c.startMinutes,
-        endMinutes: c.endMinutes,
-        startTimeFormatted: minutesToTimeString(c.startMinutes),
-        endTimeFormatted: minutesToTimeString(c.endMinutes),
-      }));
+    const dayClasses: CalendarEventItem[] = isBlocked
+      ? []
+      : classesRaw
+          .filter((c) => c.dayOfWeek === dayOfWeek)
+          .map((c) => {
+            const isPast =
+              isPastDay || (isToday && c.endMinutes <= currentMinutes);
+            return {
+              id: c.id,
+              type: "CLASS",
+              title: "In class", // SPEC §6, §10 Scenario 6: Strictly redacted
+              dayOfWeek: c.dayOfWeek,
+              startMinutes: c.startMinutes,
+              endMinutes: c.endMinutes,
+              startTimeFormatted: minutesToTimeString(c.startMinutes),
+              endTimeFormatted: minutesToTimeString(c.endMinutes),
+              isPast,
+            };
+          });
 
-    // Availability windows for this day of week
-    const dayAvailabilities: CalendarEventItem[] = availabilitiesRaw
-      .filter((a) => a.dayOfWeek === dayOfWeek)
-      .map((a) => ({
-        id: a.id,
-        type: "AVAILABILITY",
-        title: "Available for VA work",
-        dayOfWeek: a.dayOfWeek,
-        startMinutes: a.startMinutes,
-        endMinutes: a.endMinutes,
-        startTimeFormatted: minutesToTimeString(a.startMinutes),
-        endTimeFormatted: minutesToTimeString(a.endMinutes),
-      }));
+    // Raw availability windows for this day of week
+    const dayAvailabilities: CalendarEventItem[] = isBlocked
+      ? []
+      : availabilitiesRaw
+          .filter((a) => a.dayOfWeek === dayOfWeek)
+          .map((a) => ({
+            id: a.id,
+            type: "AVAILABILITY",
+            title: "Available for VA work",
+            dayOfWeek: a.dayOfWeek,
+            startMinutes: a.startMinutes,
+            endMinutes: a.endMinutes,
+            startTimeFormatted: minutesToTimeString(a.startMinutes),
+            endTimeFormatted: minutesToTimeString(a.endMinutes),
+          }));
+
+    // Real open slots from getOpenSlots for this day
+    const dayOpenSlots: CalendarEventItem[] = isBlocked
+      ? []
+      : weekOpenSlots
+          .filter((s) => {
+            const comp = toManilaTimeComponents(s.start);
+            return comp.dateKey === dateKey;
+          })
+          .map((s, idx) => {
+            const sComp = toManilaTimeComponents(s.start);
+            const eComp = toManilaTimeComponents(s.end);
+            const endMins =
+              eComp.dateKey !== sComp.dateKey && eComp.minutesFromMidnight === 0
+                ? 1440
+                : eComp.minutesFromMidnight;
+            const isPast = s.end.getTime() <= nowMs;
+
+            return {
+              id: `slot-${dateKey}-${idx}`,
+              type: "OPEN_SLOT",
+              title: "Free window",
+              dayOfWeek,
+              startMinutes: sComp.minutesFromMidnight,
+              endMinutes: endMins,
+              startTimeFormatted: minutesToTimeString(sComp.minutesFromMidnight),
+              endTimeFormatted: minutesToTimeString(endMins),
+              dateKey,
+              minutes: s.minutes,
+              isPast,
+            };
+          });
+
+    const freeMinutes = isBlocked
+      ? 0
+      : dayOpenSlots.reduce((acc, s) => acc + (s.minutes ?? 0), 0);
+    const freeHoursFormatted = `${formatHours(freeMinutes / 60)} free`;
 
     // Tasks for this specific date
-    const dayTasks: CalendarEventItem[] = tasksRaw
-      .filter((t) => {
-        const startComponents = toManilaTimeComponents(t.startAt);
-        return startComponents.dateKey === dateKey;
-      })
-      .map((t) => {
-        const startComp = toManilaTimeComponents(t.startAt);
-        const dueComp = toManilaTimeComponents(t.dueAt);
-        return {
-          id: t.id,
-          type: "TASK",
-          title: t.clientId === clientId ? t.title : "Other VA Task",
-          dayOfWeek,
-          startMinutes: startComp.minutesFromMidnight,
-          endMinutes: dueComp.minutesFromMidnight,
-          startTimeFormatted: minutesToTimeString(startComp.minutesFromMidnight),
-          endTimeFormatted: minutesToTimeString(dueComp.minutesFromMidnight),
-          dateKey,
-          taskId: t.id,
-          taskStatus: t.status,
-          estHours: t.estHours,
-        };
-      });
+    const dayTasks: CalendarEventItem[] = isBlocked
+      ? []
+      : tasksRaw
+          .filter((t) => {
+            const startComponents = toManilaTimeComponents(t.startAt);
+            return startComponents.dateKey === dateKey;
+          })
+          .map((t) => {
+            const startComp = toManilaTimeComponents(t.startAt);
+            const dueComp = toManilaTimeComponents(t.dueAt);
+            const isPast = new Date(t.dueAt).getTime() <= nowMs;
+            return {
+              id: t.id,
+              type: "TASK",
+              title: t.clientId === clientId ? t.title : "Other VA Task",
+              dayOfWeek,
+              startMinutes: startComp.minutesFromMidnight,
+              endMinutes: dueComp.minutesFromMidnight,
+              startTimeFormatted: minutesToTimeString(startComp.minutesFromMidnight),
+              endTimeFormatted: minutesToTimeString(dueComp.minutesFromMidnight),
+              dateKey,
+              taskId: t.id,
+              taskStatus: t.status,
+              estHours: t.estHours,
+              isPast,
+            };
+          });
 
     return {
       dayOfWeek,
@@ -326,10 +460,13 @@ export async function getClientCalendarData(
       dateKey,
       formattedDate: dayInfo.formattedDate,
       isToday,
-      isBlocked: !!matchedBlocked,
-      blockedReason: matchedBlocked ? (matchedBlocked.reason ?? "Unavailable") : null,
+      isPast: isPastDay,
+      isBlocked,
+      freeHoursFormatted,
+      freeMinutes,
       classes: dayClasses,
       availabilities: dayAvailabilities,
+      openSlots: dayOpenSlots,
       tasks: dayTasks,
     };
   });
@@ -346,12 +483,15 @@ export async function getClientCalendarData(
       hourlyRate: link.hourlyRate,
       maxHoursPerDay: studentProfile?.maxHoursPerDay ?? 4,
     },
+    studentLiveStatus,
+    nextFreeWindow,
     weekStartKey,
     weekEndKey,
     weekLabel,
     prevWeekKey,
     nextWeekKey,
+    currentMinutes,
+    hasAnyFreeTime: availabilitiesRaw.length > 0,
     days,
   };
 }
-

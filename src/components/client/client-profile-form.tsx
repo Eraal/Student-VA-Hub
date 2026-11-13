@@ -3,18 +3,19 @@
 import * as React from "react";
 import { updateClientProfileSchema } from "@/lib/validations/profile";
 import { updateClientProfileAction } from "@/lib/actions/profile";
+import { toUserErrorMessage, formatZodFieldErrors } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Card,
-  CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-  CardFooter,
+  CardContent,
 } from "@/components/ui/card";
-import { CheckCircle2, AlertCircle, Loader2, Lock, User } from "lucide-react";
+import { toast } from "@/components/ui/toast";
+import { Loader2, AlertCircle } from "lucide-react";
 
 interface ClientProfileFormProps {
   initialData: {
@@ -22,47 +23,41 @@ interface ClientProfileFormProps {
     name: string;
     email: string;
   };
+  onProfileSaved?: (updated: { name: string; email: string }) => void;
 }
 
-export function ClientProfileForm({ initialData }: ClientProfileFormProps) {
+export function ClientProfileForm({
+  initialData,
+  onProfileSaved,
+}: ClientProfileFormProps) {
+  const [savedData, setSavedData] = React.useState(initialData);
+
   const [name, setName] = React.useState(initialData.name);
   const [email, setEmail] = React.useState(initialData.email);
 
-  const [currentPassword, setCurrentPassword] = React.useState("");
-  const [newPassword, setNewPassword] = React.useState("");
-  const [confirmPassword, setConfirmPassword] = React.useState("");
-  const [showPasswordFields, setShowPasswordFields] = React.useState(false);
-
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
   const [serverError, setServerError] = React.useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  // Compute dirty state
+  const isDirty = name !== savedData.name || email !== savedData.email;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setServerError(null);
-    setSuccessMessage(null);
     setFieldErrors({});
 
     const formData = {
-      name,
-      email,
-      currentPassword: showPasswordFields ? currentPassword : "",
-      newPassword: showPasswordFields ? newPassword : "",
-      confirmPassword: showPasswordFields ? confirmPassword : "",
+      name: name.trim(),
+      email: email.trim(),
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
     };
 
-    // Client-side Zod validation
     const parsed = updateClientProfileSchema.safeParse(formData);
     if (!parsed.success) {
-      const errors: Record<string, string> = {};
-      for (const issue of parsed.error.issues) {
-        const field = issue.path[0];
-        if (field && typeof field === "string" && !errors[field]) {
-          errors[field] = issue.message;
-        }
-      }
-      setFieldErrors(errors);
+      setFieldErrors(formatZodFieldErrors(parsed.error));
       return;
     }
 
@@ -75,215 +70,154 @@ export function ClientProfileForm({ initialData }: ClientProfileFormProps) {
         if (res.fieldErrors) {
           setFieldErrors(res.fieldErrors);
         }
-        setServerError(res.error ?? "Failed to update profile. Please try again.");
+        setServerError(
+          toUserErrorMessage(res.error ?? "Failed to save profile.")
+        );
         setIsSubmitting(false);
         return;
       }
 
-      setSuccessMessage("Profile updated successfully.");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setShowPasswordFields(false);
+      toast.success("Profile saved");
+      const nextSaved = {
+        ...savedData,
+        name: formData.name,
+        email: formData.email,
+      };
+      setSavedData(nextSaved);
+      onProfileSaved?.(nextSaved);
       setIsSubmitting(false);
     } catch (err) {
-      console.error(err);
-      setServerError("An unexpected error occurred. Please try again.");
+      setServerError(toUserErrorMessage(err));
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Card className="border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <div className="flex size-7 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)]">
-            <User className="size-4" />
-          </div>
-          <div>
-            <CardTitle className="text-base font-semibold text-[var(--color-text)]">
-              Client Account Details
-            </CardTitle>
-            <CardDescription className="text-xs text-[var(--color-muted)]">
-              Update your contact information and password
-            </CardDescription>
-          </div>
-        </div>
+    <Card className="border-[1.5px] border-[#0F172A] bg-white shadow-[3px_3px_0px_0px_#0F172A] rounded-2xl">
+      <CardHeader className="px-5 py-4 sm:px-6 sm:py-4 border-b border-[#E5DFD5]">
+        <CardTitle className="font-display text-lg font-bold text-[#0F172A]">
+          Personal details
+        </CardTitle>
+        <CardDescription className="text-xs sm:text-sm text-slate-600">
+          Your account contact information.
+        </CardDescription>
       </CardHeader>
 
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4 pt-1">
-          {successMessage && (
-            <div
-              role="status"
-              className="flex items-start gap-2.5 rounded-md border border-[var(--color-work)] bg-[var(--color-work-bg)] p-3 text-xs text-[var(--color-work)]"
-            >
-              <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
-              <span>{successMessage}</span>
-            </div>
-          )}
-
+      <CardContent className="p-5 sm:p-6">
+        <form
+          data-testid="profile-form"
+          onSubmit={handleSubmit}
+          className="space-y-4 sm:space-y-5"
+        >
           {serverError && (
             <div
               role="alert"
-              className="flex items-start gap-2.5 rounded-md border border-[var(--color-conflict)] bg-[var(--color-conflict-bg)] p-3 text-xs text-[var(--color-conflict)]"
+              aria-live="polite"
+              className="flex items-start gap-2.5 rounded-lg border-[1.5px] border-[#DC2626] bg-[#FEF2F2] p-3 text-xs sm:text-sm text-[#991B1B]"
             >
               <AlertCircle className="size-4 shrink-0 mt-0.5" />
               <span>{serverError}</span>
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="client-name" className="text-xs font-medium text-[var(--color-text)]">
-                Full Name
-              </Label>
-              <Input
-                id="client-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={isSubmitting}
-                className="bg-[var(--color-bg)] text-xs"
-              />
-              {fieldErrors.name && (
-                <p className="text-[11px] text-[var(--color-conflict)]">{fieldErrors.name}</p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="client-email" className="text-xs font-medium text-[var(--color-text)]">
-                Email Address
-              </Label>
-              <Input
-                id="client-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isSubmitting}
-                className="bg-[var(--color-bg)] text-xs"
-              />
-              {fieldErrors.email && (
-                <p className="text-[11px] text-[var(--color-conflict)]">{fieldErrors.email}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Password Change Section */}
-          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                <Lock className="size-3.5" />
-                <span>Security & Password</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPasswordFields(!showPasswordFields);
-                  setCurrentPassword("");
-                  setNewPassword("");
-                  setConfirmPassword("");
-                }}
-                className="text-xs font-medium text-[var(--color-accent)] underline-offset-4 hover:underline cursor-pointer"
+          {/* Full Name */}
+          <div className="space-y-1.5 w-full">
+            <Label
+              htmlFor="client-name"
+              className="text-xs sm:text-sm font-bold text-[#0F172A]"
+            >
+              Full name
+            </Label>
+            <Input
+              id="client-name"
+              name="name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (fieldErrors.name) {
+                  setFieldErrors((prev) => ({ ...prev, name: "" }));
+                }
+              }}
+              disabled={isSubmitting}
+              aria-invalid={!!fieldErrors.name}
+              className="w-full text-sm"
+            />
+            {fieldErrors.name && (
+              <p
+                role="alert"
+                aria-live="polite"
+                className="text-xs text-[#DC2626] font-medium"
               >
-                {showPasswordFields ? "Cancel" : "Change password"}
-              </button>
-            </div>
-
-            {showPasswordFields && (
-              <div className="space-y-3 pt-1">
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="client-currentPassword"
-                    className="text-xs font-medium text-[var(--color-text)]"
-                  >
-                    Current Password
-                  </Label>
-                  <Input
-                    id="client-currentPassword"
-                    type="password"
-                    placeholder="Enter current password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    disabled={isSubmitting}
-                    className="bg-[var(--color-surface)] text-xs"
-                  />
-                  {fieldErrors.currentPassword && (
-                    <p className="text-[11px] text-[var(--color-conflict)]">
-                      {fieldErrors.currentPassword}
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="client-newPassword"
-                      className="text-xs font-medium text-[var(--color-text)]"
-                    >
-                      New Password (min 8 chars)
-                    </Label>
-                    <Input
-                      id="client-newPassword"
-                      type="password"
-                      placeholder="••••••••"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      disabled={isSubmitting}
-                      className="bg-[var(--color-surface)] text-xs"
-                    />
-                    {fieldErrors.newPassword && (
-                      <p className="text-[11px] text-[var(--color-conflict)]">
-                        {fieldErrors.newPassword}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="client-confirmPassword"
-                      className="text-xs font-medium text-[var(--color-text)]"
-                    >
-                      Confirm New Password
-                    </Label>
-                    <Input
-                      id="client-confirmPassword"
-                      type="password"
-                      placeholder="••••••••"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      disabled={isSubmitting}
-                      className="bg-[var(--color-surface)] text-xs"
-                    />
-                    {fieldErrors.confirmPassword && (
-                      <p className="text-[11px] text-[var(--color-conflict)]">
-                        {fieldErrors.confirmPassword}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
+                {fieldErrors.name}
+              </p>
             )}
           </div>
-        </CardContent>
 
-        <CardFooter className="pt-2 border-t border-[var(--color-border)] flex justify-end">
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="bg-[var(--color-accent)] text-[var(--color-accent-fg)] hover:bg-[var(--color-accent-hover)] text-xs font-medium h-9 cursor-pointer"
-          >
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="size-3.5 animate-spin" />
-                <span>Saving changes...</span>
-              </span>
-            ) : (
-              <span>Save changes</span>
+          {/* Email Address */}
+          <div className="space-y-1.5 w-full">
+            <Label
+              htmlFor="client-email"
+              className="text-xs sm:text-sm font-bold text-[#0F172A]"
+            >
+              Email
+            </Label>
+            <Input
+              id="client-email"
+              name="email"
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (fieldErrors.email) {
+                  setFieldErrors((prev) => ({ ...prev, email: "" }));
+                }
+              }}
+              disabled={isSubmitting}
+              aria-invalid={!!fieldErrors.email}
+              className="w-full text-sm"
+            />
+            {fieldErrors.email && (
+              <p
+                role="alert"
+                aria-live="polite"
+                className="text-xs text-[#DC2626] font-medium"
+              >
+                {fieldErrors.email}
+              </p>
             )}
-          </Button>
-        </CardFooter>
-      </form>
+          </div>
+
+          {/* Action Row */}
+          <div className="pt-2 border-t border-[#E5DFD5] flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div>
+              {isDirty && (
+                <span
+                  data-testid="profile-dirty-hint"
+                  className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-300 rounded-md px-2.5 py-1"
+                >
+                  Unsaved changes
+                </span>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              data-testid="profile-save"
+              disabled={!isDirty || isSubmitting}
+              className="w-full sm:w-auto min-h-[40px] font-bold disabled:opacity-40"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  <span>Saving changes...</span>
+                </span>
+              ) : (
+                <span>Save changes</span>
+              )}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
     </Card>
   );
 }
-

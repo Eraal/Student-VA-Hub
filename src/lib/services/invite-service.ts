@@ -182,24 +182,65 @@ export async function linkStudentToClient(
 }
 
 /**
+ * Serialized representation of a linked student for the Client Profile.
+ * Contains ONLY non-sensitive contact and link details (school, course, year omitted).
+ */
+export interface SerializedClientLinkedStudent {
+  id: string;
+  hourlyRate: number;
+  status: string;
+  createdAt: Date | string;
+  student: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+/**
+ * Strips any university, academic, or sensitive profile fields from a link object.
+ * Guarantees that only name, email, hourly rate, link status, and link createdAt reach client components.
+ */
+export function serializeClientProfileLink(
+  rawLink: any
+): SerializedClientLinkedStudent | null {
+  if (!rawLink || !rawLink.student) return null;
+  return {
+    id: rawLink.id,
+    hourlyRate: rawLink.hourlyRate,
+    status: String(rawLink.status),
+    createdAt: rawLink.createdAt,
+    student: {
+      id: rawLink.student.id,
+      name: rawLink.student.name ?? "",
+      email: rawLink.student.email ?? "",
+    },
+  };
+}
+
+/**
  * Returns linked student and rate for a client.
+ * Strictly limits student fields to name and email to protect privacy.
  */
 export async function getClientLinkedStudent(clientId: string) {
   const link = await prisma.clientStudentLink.findFirst({
     where: { clientId },
-    include: {
+    select: {
+      id: true,
+      hourlyRate: true,
+      status: true,
+      createdAt: true,
       student: {
         select: {
           id: true,
           name: true,
           email: true,
-          studentProfile: true,
         },
       },
     },
   });
 
-  return link;
+  return link ? serializeClientProfileLink(link) : null;
 }
 
 /**

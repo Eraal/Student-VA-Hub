@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { toUserErrorMessage } from "@/lib/errors";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 
 export default function ClientRouteError({
@@ -23,10 +24,10 @@ export default function ClientRouteError({
 
       <div className="space-y-1">
         <h2 className="text-base font-semibold text-[var(--color-text)]">
-          Hindi ma-load ang client page
+          Unable to load page
         </h2>
         <p className="text-xs text-[var(--color-muted)]">
-          {error.message || "Nagkaroon ng problema habang kinukuha ang iyong datos."}
+          {toUserErrorMessage(error)}
         </p>
       </div>
 
@@ -38,7 +39,7 @@ export default function ClientRouteError({
           className="gap-1.5 text-xs cursor-pointer"
         >
           <RotateCcw className="size-3.5" />
-          <span>Subukan muli</span>
+          <span>Try again</span>
         </Button>
       </div>
     </div>

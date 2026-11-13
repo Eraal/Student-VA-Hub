@@ -1,6 +1,13 @@
 import { prisma } from "../prisma";
 import { InvoiceStatus, TimeLogStatus, CorrectionStatus } from "@prisma/client";
-import { calculateLoggedHours } from "./time-service";
+import { createNotification } from "../notifications";
+import {
+  calculateLoggedHours,
+  calculateLogAmount,
+  sumMoney,
+  hoursToMinutes,
+} from "../money";
+import { formatHours, formatPeso } from "../format";
 
 export interface FormattedInvoice {
   id: string;
@@ -23,6 +30,8 @@ export interface ClientTimesheetData {
     id: string;
     taskId: string;
     taskTitle: string;
+    taskEstHours: number;
+    taskLoggedHours: number;
     timeIn: Date;
     timeOut: Date | null;
     totalHours: number;
@@ -36,6 +45,8 @@ export interface ClientTimesheetData {
     id: string;
     taskId: string;
     taskTitle: string;
+    taskEstHours: number;
+    taskLoggedHours: number;
     timeIn: Date;
     timeOut: Date | null;
     totalHours: number;
@@ -98,7 +109,17 @@ export async function getClientTimesheetData(clientId: string): Promise<ClientTi
         task: { clientId },
         status: { in: [TimeLogStatus.CLOSED, TimeLogStatus.APPROVED] },
       },
-      include: { task: { select: { title: true } } },
+      include: {
+        task: {
+          select: {
+            title: true,
+            estHours: true,
+            timeLogs: {
+              select: { totalHours: true },
+            },
+          },
+        },
+      },
       orderBy: { timeIn: "desc" },
     }),
     prisma.invoice.findMany({
@@ -117,6 +138,10 @@ export async function getClientTimesheetData(clientId: string): Promise<ClientTi
       id: l.id,
       taskId: l.taskId,
       taskTitle: l.task.title,
+      taskEstHours: l.task.estHours ?? 0,
+      taskLoggedHours: Math.round(
+        (l.task.timeLogs?.reduce((acc, tl) => acc + (tl.totalHours ?? 0), 0) ?? 0) * 60
+      ) / 60,
       timeIn: l.timeIn,
       timeOut: l.timeOut,
       totalHours: l.totalHours ?? 0,
@@ -133,6 +158,10 @@ export async function getClientTimesheetData(clientId: string): Promise<ClientTi
       id: l.id,
       taskId: l.taskId,
       taskTitle: l.task.title,
+      taskEstHours: l.task.estHours ?? 0,
+      taskLoggedHours: Math.round(
+        (l.task.timeLogs?.reduce((acc, tl) => acc + (tl.totalHours ?? 0), 0) ?? 0) * 60
+      ) / 60,
       timeIn: l.timeIn,
       timeOut: l.timeOut,
       totalHours: l.totalHours ?? 0,
@@ -156,16 +185,23 @@ export async function getClientTimesheetData(clientId: string): Promise<ClientTi
   const pendingHours = pendingLogs.reduce((acc, l) => acc + l.totalHours, 0);
   const approvedHours = approvedLogs.reduce((acc, l) => acc + l.totalHours, 0);
 
+  const pendingAmount = sumMoney(
+    pendingLogs.map((l) => calculateLogAmount(l.totalHours, hourlyRate))
+  );
+  const approvedAmount = sumMoney(
+    approvedLogs.map((l) => calculateLogAmount(l.totalHours, hourlyRate))
+  );
+
   return {
     linkedStudent: student,
     hourlyRate,
     pendingLogs,
     approvedLogs,
     invoices,
-    pendingHours: Math.round(pendingHours * 100) / 100,
-    approvedHours: Math.round(approvedHours * 100) / 100,
-    pendingAmount: Math.round(pendingHours * hourlyRate * 100) / 100,
-    approvedAmount: Math.round(approvedHours * hourlyRate * 100) / 100,
+    pendingHours: Math.round(pendingHours * 60) / 60,
+    approvedHours: Math.round(approvedHours * 60) / 60,
+    pendingAmount,
+    approvedAmount,
   };
 }
 
@@ -183,183 +219,264 @@ export async function approveTimeLog(clientId: string, timeLogId: string) {
     throw new Error("Time log not found or unauthorized.");
   }
 
+  if (log.status !== TimeLogStatus.CLOSED) {
+    throw new Error("Only a closed time log can be approved.");
+  }
+
   const studentId = log.studentId;
   const link = await prisma.clientStudentLink.findFirst({
     where: { clientId, studentId, status: "ACTIVE" },
   });
   const rate = link?.hourlyRate ?? 150;
 
-  // 1. Mark log as APPROVED
-  const approvedLog = await prisma.timeLog.update({
-    where: { id: timeLogId },
-    data: { status: TimeLogStatus.APPROVED },
-  });
-
-  const logHours = approvedLog.totalHours ?? 0;
-
-  // 2. Find or create an invoice with status APPROVED
-  const existingInvoice = await prisma.invoice.findFirst({
-    where: {
-      clientId,
-      studentId,
-      status: { in: [InvoiceStatus.PENDING, InvoiceStatus.APPROVED] },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  let invoice;
-  if (existingInvoice) {
-    const newTotalHours = Math.round((existingInvoice.totalHours + logHours) * 100) / 100;
-    const newAmount = Math.round(newTotalHours * rate * 100) / 100;
-
-    invoice = await prisma.invoice.update({
-      where: { id: existingInvoice.id },
-      data: {
-        totalHours: newTotalHours,
-        amount: newAmount,
-        status: InvoiceStatus.APPROVED,
-      },
+  const result = await prisma.$transaction(async (tx) => {
+    // The conditional transition makes approval idempotent under concurrent requests.
+    const transition = await tx.timeLog.updateMany({
+      where: { id: timeLogId, status: TimeLogStatus.CLOSED },
+      data: { status: TimeLogStatus.APPROVED },
     });
-  } else {
-    const amount = Math.round(logHours * rate * 100) / 100;
-    invoice = await prisma.invoice.create({
-      data: {
+
+    if (transition.count !== 1) {
+      throw new Error("Only a closed time log can be approved.");
+    }
+
+    const approvedLog = await tx.timeLog.findUniqueOrThrow({
+      where: { id: timeLogId },
+    });
+    const logHours = approvedLog.totalHours ?? 0;
+    const logAmount = calculateLogAmount(logHours, rate);
+
+    const existingInvoice = await tx.invoice.findFirst({
+      where: {
         clientId,
         studentId,
-        totalHours: logHours,
-        rate,
-        amount,
-        status: InvoiceStatus.APPROVED,
+        status: { in: [InvoiceStatus.PENDING, InvoiceStatus.APPROVED] },
       },
+      orderBy: { createdAt: "desc" },
     });
-  }
 
-  // 3. Notify student
-  await prisma.notification.create({
-    data: {
-      userId: studentId,
+    let invoice;
+    if (existingInvoice) {
+      const newTotalHours = Math.round((existingInvoice.totalHours + logHours) * 60) / 60;
+      const newAmount = sumMoney([existingInvoice.amount, logAmount]);
+
+      invoice = await tx.invoice.update({
+        where: { id: existingInvoice.id },
+        data: {
+          totalHours: newTotalHours,
+          amount: newAmount,
+          status: InvoiceStatus.APPROVED,
+        },
+      });
+    } else {
+      invoice = await tx.invoice.create({
+        data: {
+          clientId,
+          studentId,
+          totalHours: logHours,
+          rate,
+          amount: logAmount,
+          status: InvoiceStatus.APPROVED,
+        },
+      });
+    }
+
+    const clientUser = await tx.user.findUnique({
+      where: { id: clientId },
+      select: { name: true },
+    });
+    const clientName = clientUser?.name || "Client";
+
+    await createNotification(tx, {
+      recipientId: studentId,
+      actorId: clientId,
       type: "HOURS_APPROVED",
-      message: `Your client approved ${logHours}h for "${log.task.title}". Invoice amount: ₱${invoice.amount}.`,
-    },
+      message: `${clientName} approved ${formatHours(logHours)} for ${log.task.title}. Invoice total: ${formatPeso(invoice.amount)}`,
+    });
+
+    return { approvedLog, invoice };
   });
 
-  return { approvedLog, invoice };
+  return result;
 }
 
 /**
- * Disputes a time log with a reason.
+ * Disputes a time log with a reason in one transaction.
  */
 export async function disputeTimeLog(clientId: string, timeLogId: string, disputeReason: string) {
-  const log = await prisma.timeLog.findUnique({
-    where: { id: timeLogId },
-    include: { task: true },
-  });
+  return await prisma.$transaction(async (tx) => {
+    const log = await tx.timeLog.findUnique({
+      where: { id: timeLogId },
+      include: {
+        task: {
+          include: {
+            client: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
 
-  if (!log || log.task.clientId !== clientId) {
-    throw new Error("Time log not found or unauthorized.");
-  }
+    if (!log || log.task.clientId !== clientId) {
+      throw new Error("Time log not found or unauthorized.");
+    }
 
-  const updated = await prisma.timeLog.update({
-    where: { id: timeLogId },
-    data: { disputeReason: disputeReason.trim() },
-  });
+    if (log.status !== TimeLogStatus.CLOSED) {
+      throw new Error("Only a closed time log can be disputed.");
+    }
 
-  await prisma.notification.create({
-    data: {
-      userId: log.studentId,
+    if (log.disputeReason) {
+      throw new Error("This was already done.");
+    }
+
+    const truncatedReason = disputeReason.trim().slice(0, 140);
+
+    const updateRes = await tx.timeLog.updateMany({
+      where: {
+        id: timeLogId,
+        status: TimeLogStatus.CLOSED,
+        disputeReason: null,
+      },
+      data: { disputeReason: truncatedReason },
+    });
+
+    if (updateRes.count !== 1) {
+      throw new Error("This was already done.");
+    }
+
+    const clientName = log.task.client.name || "Client";
+    const formattedH = formatHours(log.totalHours ?? 0);
+
+    await createNotification(tx, {
+      recipientId: log.studentId,
+      actorId: clientId,
       type: "HOURS_DISPUTED",
-      message: `Your logged hours for "${log.task.title}" were disputed: ${disputeReason.trim()}`,
-    },
-  });
+      message: `${clientName} disputed ${formattedH} on ${log.task.title}. Reason: ${truncatedReason}`,
+    });
 
-  return updated;
+    return await tx.timeLog.findUniqueOrThrow({ where: { id: timeLogId } });
+  });
 }
 
 /**
- * Approves or rejects a student's requested time correction.
+ * Approves or rejects a student's requested time correction in one transaction.
  */
 export async function respondToCorrection(
   clientId: string,
   timeLogId: string,
   decision: "APPROVE" | "REJECT"
 ) {
-  const log = await prisma.timeLog.findUnique({
-    where: { id: timeLogId },
-    include: { task: true },
-  });
+  return await prisma.$transaction(async (tx) => {
+    const log = await tx.timeLog.findUnique({
+      where: { id: timeLogId },
+      include: {
+        task: {
+          include: {
+            client: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
 
-  if (!log || log.task.clientId !== clientId) {
-    throw new Error("Time log not found or unauthorized.");
-  }
-
-  if (decision === "APPROVE") {
-    if (!log.requestedTimeOut) {
-      throw new Error("No requested time out recorded on this log.");
+    if (!log || log.task.clientId !== clientId) {
+      throw new Error("Time log not found or unauthorized.");
     }
-    const newHours = calculateLoggedHours(log.timeIn, log.requestedTimeOut);
 
-    const updated = await prisma.timeLog.update({
-      where: { id: timeLogId },
-      data: {
-        timeOut: log.requestedTimeOut,
-        totalHours: newHours,
-        correctionStatus: CorrectionStatus.APPROVED,
-      },
-    });
+    if (log.correctionStatus !== CorrectionStatus.PENDING) {
+      throw new Error("This time log has no pending correction request.");
+    }
 
-    await prisma.notification.create({
-      data: {
-        userId: log.studentId,
+    const clientName = log.task.client.name || "Client";
+
+    if (decision === "APPROVE") {
+      if (!log.requestedTimeOut) {
+        throw new Error("No requested time out recorded on this log.");
+      }
+      const newHours = calculateLoggedHours(log.timeIn, log.requestedTimeOut);
+
+      const updateRes = await tx.timeLog.updateMany({
+        where: { id: timeLogId, correctionStatus: CorrectionStatus.PENDING },
+        data: {
+          timeOut: log.requestedTimeOut,
+          totalHours: newHours,
+          correctionStatus: CorrectionStatus.APPROVED,
+        },
+      });
+
+      if (updateRes.count !== 1) {
+        throw new Error("This was already done.");
+      }
+
+      await createNotification(tx, {
+        recipientId: log.studentId,
+        actorId: clientId,
         type: "CORRECTION_APPROVED",
-        message: `Your time correction for "${log.task.title}" was approved (${newHours}h).`,
-      },
-    });
+        message: `${clientName} approved your time correction on ${log.task.title}. New total: ${formatHours(newHours)}`,
+      });
 
-    return updated;
-  } else {
-    const updated = await prisma.timeLog.update({
-      where: { id: timeLogId },
-      data: { correctionStatus: CorrectionStatus.REJECTED },
-    });
+      return await tx.timeLog.findUniqueOrThrow({ where: { id: timeLogId } });
+    } else {
+      const updateRes = await tx.timeLog.updateMany({
+        where: { id: timeLogId, correctionStatus: CorrectionStatus.PENDING },
+        data: { correctionStatus: CorrectionStatus.REJECTED },
+      });
 
-    await prisma.notification.create({
-      data: {
-        userId: log.studentId,
+      if (updateRes.count !== 1) {
+        throw new Error("This was already done.");
+      }
+
+      await createNotification(tx, {
+        recipientId: log.studentId,
+        actorId: clientId,
         type: "CORRECTION_REJECTED",
-        message: `Your time correction for "${log.task.title}" was rejected.`,
-      },
-    });
+        message: `${clientName} declined your time correction on ${log.task.title}`,
+      });
 
-    return updated;
-  }
+      return await tx.timeLog.findUniqueOrThrow({ where: { id: timeLogId } });
+    }
+  });
 }
 
 /**
- * Marks an invoice as PAID (Acceptance Test Scenario 11).
+ * Marks an invoice as PAID in one transaction (Acceptance Test Scenario 11).
  */
 export async function markInvoicePaid(clientId: string, invoiceId: string) {
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
-  });
+  return await prisma.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findUnique({
+      where: { id: invoiceId },
+    });
 
-  if (!invoice || invoice.clientId !== clientId) {
-    throw new Error("Invoice not found or unauthorized.");
-  }
+    if (!invoice || invoice.clientId !== clientId) {
+      throw new Error("Invoice not found or unauthorized.");
+    }
 
-  const updated = await prisma.invoice.update({
-    where: { id: invoiceId },
-    data: { status: InvoiceStatus.PAID },
-  });
+    if (invoice.status !== InvoiceStatus.APPROVED) {
+      throw new Error("Only an approved invoice can be marked as paid.");
+    }
 
-  await prisma.notification.create({
-    data: {
-      userId: invoice.studentId,
+    const updateRes = await tx.invoice.updateMany({
+      where: { id: invoiceId, clientId, status: InvoiceStatus.APPROVED },
+      data: { status: InvoiceStatus.PAID },
+    });
+
+    if (updateRes.count !== 1) {
+      throw new Error("This was already done.");
+    }
+
+    const clientUser = await tx.user.findUnique({
+      where: { id: clientId },
+      select: { name: true },
+    });
+    const clientName = clientUser?.name || "Client";
+
+    await createNotification(tx, {
+      recipientId: invoice.studentId,
+      actorId: clientId,
       type: "INVOICE_PAID",
-      message: `Invoice for ₱${invoice.amount} has been marked as PAID by your client!`,
-    },
-  });
+      message: `${clientName} marked your ${formatPeso(invoice.amount)} invoice as paid`,
+    });
 
-  return updated;
+    return await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+  });
 }
 
 /**
@@ -429,35 +546,35 @@ export async function getStudentEarningsData(studentId: string): Promise<Student
           sessionsCount: 0,
         };
       }
+      const logAmount = calculateLogAmount(h, hourlyRate);
       taskMap[log.taskId].totalHours += h;
-      taskMap[log.taskId].amount += h * hourlyRate;
+      taskMap[log.taskId].amount = sumMoney([taskMap[log.taskId].amount, logAmount]);
       taskMap[log.taskId].sessionsCount += 1;
     }
   }
 
   const taskBreakdown = Object.values(taskMap).map((item) => ({
     ...item,
-    totalHours: Math.round(item.totalHours * 100) / 100,
-    amount: Math.round(item.amount * 100) / 100,
+    totalHours: Math.round(item.totalHours * 60) / 60,
+    amount: item.amount,
   }));
 
-  const totalEarnedPaid = invoices
-    .filter((inv) => inv.status === InvoiceStatus.PAID)
-    .reduce((acc, inv) => acc + inv.amount, 0);
+  const totalEarnedPaid = sumMoney(
+    invoices.filter((inv) => inv.status === InvoiceStatus.PAID).map((inv) => inv.amount)
+  );
 
-  const totalEarnedApproved = invoices
-    .filter((inv) => inv.status === InvoiceStatus.APPROVED)
-    .reduce((acc, inv) => acc + inv.amount, 0);
+  const totalEarnedApproved = sumMoney(
+    invoices.filter((inv) => inv.status === InvoiceStatus.APPROVED).map((inv) => inv.amount)
+  );
 
   return {
     linkedClient: client,
     hourlyRate,
-    totalApprovedHours: Math.round(totalApprovedHours * 100) / 100,
-    totalPendingHours: Math.round(totalPendingHours * 100) / 100,
-    totalEarnedPaid: Math.round(totalEarnedPaid * 100) / 100,
-    totalEarnedApproved: Math.round(totalEarnedApproved * 100) / 100,
+    totalApprovedHours: Math.round(totalApprovedHours * 60) / 60,
+    totalPendingHours: Math.round(totalPendingHours * 60) / 60,
+    totalEarnedPaid,
+    totalEarnedApproved,
     invoices,
     taskBreakdown,
   };
 }
-

@@ -3,34 +3,71 @@
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { Role } from "@prisma/client";
+import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { displayFontClass } from "@/components/landing/fonts";
 import { loginSchema } from "@/lib/validations/auth";
 import { loginAction } from "@/lib/actions/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2, Loader2, LogIn, KeyRound } from "lucide-react";
+import { toUserErrorMessage } from "@/lib/errors";
+
+/**
+ * Validates and sanitizes a callbackUrl to protect against open redirects.
+ * Only relative paths starting with a single '/' are accepted.
+ * Rejects absolute URLs, protocol-relative ('//'), backslash traversal ('/\'), and scheme prefixes.
+ */
+export function getSafeCallbackUrl(url: string | null | undefined): string | null {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.startsWith("/\\")) {
+    return null;
+  }
+  if (trimmed.includes("://")) {
+    return null;
+  }
+  return trimmed;
+}
+
+// Dev-only demo credentials helper. Completely pruned in production bundles.
+const DevDemoCredentials =
+  process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_SHOW_DEMO_LOGINS === "true"
+    ? dynamic(
+        () => import("./dev-demo-credentials").then((mod) => mod.DevDemoCredentials),
+        { ssr: false }
+      )
+    : null;
 
 export function LoginForm() {
   const searchParams = useSearchParams();
   const registeredParam = searchParams.get("registered");
   const emailParam = searchParams.get("email");
   const errorParam = searchParams.get("error");
+  const rawCallbackUrl = searchParams.get("callbackUrl");
 
   const [email, setEmail] = React.useState(emailParam ?? "");
   const [password, setPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
 
   const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
-  const [serverError, setServerError] = React.useState<string | null>(
-    errorParam === "CredentialsSignin"
-      ? "Invalid email or password. Please try again."
-      : null,
+  const [formError, setFormError] = React.useState<string | null>(
+    errorParam === "CredentialsSignin" ? "Email or password is incorrect." : null
   );
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const emailInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Auto-focus email field only on desktop
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
+      if (!emailParam) {
+        emailInputRef.current?.focus();
+      }
+    }
+  }, [emailParam]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setServerError(null);
+    setFormError(null);
     setFieldErrors({});
 
     const formData = {
@@ -61,182 +98,203 @@ export function LoginForm() {
         if (res.fieldErrors) {
           setFieldErrors(res.fieldErrors);
         }
-        setServerError(res.error ?? "Invalid email or password. Please try again.");
+        // Unified error message for wrong email vs wrong password
+        if (
+          res.error === "Invalid email or password. Please try again." ||
+          res.error === "Please provide a valid email and password."
+        ) {
+          setFormError("Email or password is incorrect.");
+        } else {
+          setFormError(res.error ? toUserErrorMessage(res.error) : "Email or password is incorrect.");
+        }
         setIsSubmitting(false);
         return;
       }
 
-      // If redirect did not trigger automatically inside action, manual fallback:
-      if (res.data?.redirectUrl) {
-        window.location.href = res.data.redirectUrl;
-      }
+      // Safe redirect determination
+      const safeCallback = getSafeCallbackUrl(rawCallbackUrl);
+      const defaultDashboard = res.data?.role === Role.STUDENT ? "/student" : "/client";
+      const destination = safeCallback || res.data?.redirectUrl || defaultDashboard;
+
+      window.location.href = destination;
     } catch (err: unknown) {
-      // Check if it's a Next.js redirect (which throws NEXT_REDIRECT)
+      // Normal Next.js redirect thrown by server action
       if (err && typeof err === "object" && "digest" in err) {
-        // Normal Next.js redirect thrown by server action
         return;
       }
-      console.error(err);
-      setServerError("An error occurred while signing in. Please check your credentials.");
+      setFormError(toUserErrorMessage(err));
       setIsSubmitting(false);
     }
   };
 
-  const handleFillDemo = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword("demo1234");
-    setServerError(null);
-    setFieldErrors({});
-  };
-
   return (
-    <Card className="w-full max-w-md border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
-      <CardHeader className="space-y-1 pb-4">
-        <div className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)]">
-            <LogIn className="size-4" />
-          </span>
-          <div>
-            <CardTitle className="text-xl font-semibold tracking-tight text-[var(--color-text)]">
-              Sign in to Student VA-Hub
-            </CardTitle>
-            <CardDescription className="text-xs text-[var(--color-muted)]">
-              Enter your email and password to access your portal
-            </CardDescription>
+    <div className="w-full space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className={`${displayFontClass} text-xl font-semibold tracking-tight text-[#0F172A]`}>
+          Log in to your account
+        </h1>
+        <p className="text-xs text-slate-500 mt-1">
+          Enter your email and password below.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {/* Registration Success Banner */}
+        {registeredParam && (
+          <div
+            role="status"
+            className="flex items-start gap-2.5 rounded-md border border-[#16A34A]/30 bg-[#F0FDF4] p-2.5 text-xs text-[#166534]"
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-[#16A34A] mt-0.5" />
+            <span>Account created successfully. Please enter your password to log in.</span>
           </div>
-        </div>
-      </CardHeader>
+        )}
 
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          {/* Registration Success Banner */}
-          {registeredParam && (
-            <div
-              role="status"
-              className="flex items-start gap-2.5 rounded-md border border-[var(--color-work)] bg-[var(--color-work-bg)] p-3 text-xs text-[var(--color-work)]"
-            >
-              <CheckCircle2 className="size-4 shrink-0 mt-0.5" />
-              <span>
-                Account created successfully. Please enter your password to sign in.
-              </span>
-            </div>
-          )}
+        {/* Dev Demo Credentials (development only, eliminated in production) */}
+        {DevDemoCredentials && (
+          <DevDemoCredentials
+            onSelectEmail={(demoEmail) => {
+              setEmail(demoEmail);
+              setFormError(null);
+              setFieldErrors({});
+            }}
+          />
+        )}
 
-          {/* Server Error Alert */}
-          {serverError && (
-            <div
-              role="alert"
-              className="flex items-start gap-2.5 rounded-md border border-[var(--color-conflict)] bg-[var(--color-conflict-bg)] p-3 text-xs text-[var(--color-conflict)]"
-            >
-              <AlertCircle className="size-4 shrink-0 mt-0.5" />
-              <span>{serverError}</span>
-            </div>
-          )}
-
-          {/* Email field */}
-          <div className="space-y-1.5">
-            <Label htmlFor="login-email" className="text-xs font-medium text-[var(--color-text)]">
-              Email Address
-            </Label>
-            <Input
-              id="login-email"
-              type="email"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isSubmitting}
-              className="bg-[var(--color-bg)] text-xs"
-              autoComplete="email"
-            />
-            {fieldErrors.email && (
-              <p className="text-[11px] text-[var(--color-conflict)]">{fieldErrors.email}</p>
-            )}
-          </div>
-
-          {/* Password field */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label
-                htmlFor="login-password"
-                className="text-xs font-medium text-[var(--color-text)]"
-              >
-                Password
-              </Label>
-              <Link
-                href="/forgot-password"
-                className="text-[11px] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
-            <Input
-              id="login-password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isSubmitting}
-              className="bg-[var(--color-bg)] text-xs"
-              autoComplete="current-password"
-            />
-            {fieldErrors.password && (
-              <p className="text-[11px] text-[var(--color-conflict)]">{fieldErrors.password}</p>
-            )}
-          </div>
-
-          {/* Quick Demo Accounts Helper */}
-          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-3 space-y-2">
-            <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)]">
-              <KeyRound className="size-3.5" />
-              <span>Dev Demo Credentials</span>
-            </div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => handleFillDemo("juan@example.com")}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] font-medium text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors cursor-pointer"
-              >
-                Student: juan@example.com
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFillDemo("maria@example.com")}
-                className="rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[11px] font-medium text-[var(--color-text)] hover:border-[var(--color-accent)] transition-colors cursor-pointer"
-              >
-                Client: maria@example.com
-              </button>
-            </div>
-          </div>
-        </CardContent>
-
-        <CardFooter className="flex flex-col gap-3 pt-2">
-          <Button
-            type="submit"
+        {/* Email field */}
+        <div>
+          <label
+            htmlFor="login-email"
+            className="block text-xs font-medium text-slate-700 mb-1.5"
+          >
+            Email address
+          </label>
+          <input
+            ref={emailInputRef}
+            id="login-email"
+            data-testid="login-email"
+            type="email"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (fieldErrors.email) {
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.email;
+                  return next;
+                });
+              }
+            }}
             disabled={isSubmitting}
-            className="w-full bg-[var(--color-accent)] text-[var(--color-accent-fg)] hover:bg-[var(--color-accent-hover)] cursor-pointer text-xs font-medium h-9"
+            autoComplete="username"
+            className="h-9 w-full rounded-md border border-[#E5DFD5] bg-white px-3 py-1.5 text-sm text-[#0F172A] shadow-2xs transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#0F172A] focus-visible:border-[#0F172A] disabled:opacity-50"
+          />
+          {fieldErrors.email && (
+            <p role="alert" className="text-xs text-[#DC2626] mt-1 font-medium">
+              {fieldErrors.email}
+            </p>
+          )}
+        </div>
+
+        {/* Password field */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label
+              htmlFor="login-password"
+              className="block text-xs font-medium text-slate-700"
+            >
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              data-testid="login-forgot-link"
+              className="text-xs font-medium text-slate-500 hover:text-[#0F172A] hover:underline transition-colors"
+            >
+              Forgot password?
+            </Link>
+          </div>
+          <div className="relative">
+            <input
+              id="login-password"
+              data-testid="login-password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Your password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (fieldErrors.password) {
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.password;
+                    return next;
+                  });
+                }
+              }}
+              disabled={isSubmitting}
+              autoComplete="current-password"
+              className="h-9 w-full rounded-md border border-[#E5DFD5] bg-white pl-3 pr-9 py-1.5 text-sm text-[#0F172A] shadow-2xs transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#0F172A] focus-visible:border-[#0F172A] disabled:opacity-50"
+            />
+            <button
+              type="button"
+              data-testid="login-password-toggle"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-0 top-0 h-9 w-9 flex items-center justify-center text-slate-400 hover:text-[#0F172A] cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#0F172A] rounded-r-md transition-colors"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {fieldErrors.password && (
+            <p role="alert" className="text-xs text-[#DC2626] mt-1 font-medium">
+              {fieldErrors.password}
+            </p>
+          )}
+        </div>
+
+        {/* Form-level Error Alert */}
+        {formError && (
+          <div
+            role="alert"
+            data-testid="login-error"
+            className="flex items-center gap-2 rounded-md border border-[#DC2626]/30 bg-[#FEF2F2] p-2.5 text-xs text-[#991B1B] font-medium"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 text-[#DC2626]" />
+            <span>{formError}</span>
+          </div>
+        )}
+
+        {/* Primary Submit Button */}
+        <div className="pt-1">
+          <button
+            type="submit"
+            data-testid="login-submit"
+            disabled={isSubmitting}
+            className="w-full h-9 rounded-md bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs font-medium shadow-2xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="size-3.5 animate-spin" />
-                <span>Signing in...</span>
-              </span>
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                <span>Logging in...</span>
+              </>
             ) : (
-              <span>Sign in</span>
+              <span>Log in</span>
             )}
-          </Button>
+          </button>
+        </div>
 
-          <p className="text-center text-xs text-[var(--color-muted)]">
-            Don&apos;t have an account?{" "}
-            <Link
-              href="/register"
-              className="font-medium text-[var(--color-accent)] underline-offset-4 hover:underline"
-            >
-              Create an account
-            </Link>
-          </p>
-        </CardFooter>
+        {/* Link to Register */}
+        <p className="text-center text-xs text-slate-500 pt-1">
+          New here?{" "}
+          <Link
+            href="/register"
+            className="font-medium text-[#0F172A] underline underline-offset-4 hover:text-slate-700 transition-colors"
+          >
+            Create an account
+          </Link>
+        </p>
       </form>
-    </Card>
+    </div>
   );
 }
-

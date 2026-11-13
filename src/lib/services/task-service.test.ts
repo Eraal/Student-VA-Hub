@@ -31,6 +31,10 @@ describe("task-service", () => {
 
     clientId = client.id;
     studentId = student.id;
+
+    await prisma.notification.deleteMany({
+      where: { userId: { in: [studentId, clientId] } },
+    });
   });
 
   afterEach(async () => {
@@ -113,6 +117,7 @@ describe("task-service", () => {
         where: {
           userId: studentId,
           type: "TASK_ASSIGNED",
+          message: { contains: "Create graphic assets" },
         },
         orderBy: { createdAt: "desc" },
       });

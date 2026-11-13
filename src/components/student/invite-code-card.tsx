@@ -3,23 +3,16 @@
 import * as React from "react";
 import { generateStudentInviteCodeAction } from "@/lib/actions/invite-code";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
-  CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
+  CardContent,
 } from "@/components/ui/card";
-import {
-  Key,
-  Copy,
-  Check,
-  RefreshCw,
-  AlertCircle,
-  Briefcase,
-  Users,
-} from "lucide-react";
+import { toast } from "@/components/ui/toast";
+import { toUserErrorMessage } from "@/lib/errors";
+import { Copy, Share2, Loader2, AlertCircle } from "lucide-react";
 
 interface InviteCodeCardProps {
   initialCode: {
@@ -45,27 +38,52 @@ interface InviteCodeCardProps {
   } | null;
 }
 
+export function formatInviteCode(code: string): string {
+  const clean = code.replace(/\s+/g, "");
+  if (clean.length === 8) {
+    return `${clean.slice(0, 4)} ${clean.slice(4)}`;
+  }
+  return clean;
+}
+
 export function InviteCodeCard({
   initialCode,
   initialLinkedClient,
   initialLink,
 }: InviteCodeCardProps) {
   const [currentCode, setCurrentCode] = React.useState(initialCode);
-  const [linkedClient] = React.useState(initialLinkedClient);
-  const [link] = React.useState(initialLink);
-
-  const [copied, setCopied] = React.useState(false);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [canShare, setCanShare] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      setCanShare(true);
+    }
+  }, []);
+
+  const hasActiveLink = initialLink && initialLink.status === "ACTIVE";
+  const hasUnusedCode = currentCode && !currentCode.usedByClientId;
 
   const handleCopy = async () => {
     if (!currentCode?.code) return;
     try {
       await navigator.clipboard.writeText(currentCode.code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      toast.success("Code copied");
     } catch (err) {
       console.error("Failed to copy code:", err);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!currentCode?.code || !navigator.share) return;
+    try {
+      await navigator.share({
+        title: "Student VA-Hub Invite Code",
+        text: `Link with me on Student VA-Hub using my invite code: ${currentCode.code}`,
+      });
+    } catch {
+      // User cancelled share dialog or unsupported, ignore
     }
   };
 
@@ -76,7 +94,9 @@ export function InviteCodeCard({
     try {
       const res = await generateStudentInviteCodeAction();
       if (!res.success || !res.data) {
-        setErrorMessage(res.error ?? "Failed to generate invite code.");
+        setErrorMessage(
+          toUserErrorMessage(res.error ?? "Failed to generate invite code.")
+        );
         setIsGenerating(false);
         return;
       }
@@ -88,177 +108,111 @@ export function InviteCodeCard({
         createdAt: new Date(),
         usedByClient: null,
       });
+      toast.success("Invite code generated");
       setIsGenerating(false);
     } catch (err) {
-      console.error(err);
-      setErrorMessage("An unexpected error occurred. Please try again.");
+      setErrorMessage(toUserErrorMessage(err));
       setIsGenerating(false);
     }
   };
 
-  const isUsed = !!currentCode?.usedByClientId;
-
   return (
-    <div className="space-y-4">
-      {/* Linked Client Card */}
-      <Card className="border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)]">
-              <Briefcase className="size-4" />
-            </div>
-            <div>
-              <CardTitle className="text-base font-semibold text-[var(--color-text)]">
-                Linked Client
-              </CardTitle>
-              <CardDescription className="text-xs text-[var(--color-muted)]">
-                Your assigned client and agreed hourly rate
-              </CardDescription>
-            </div>
+    <Card className="border-[1.5px] border-[#0F172A] bg-white shadow-[3px_3px_0px_0px_#0F172A] rounded-2xl">
+      <CardHeader className="px-5 py-4 sm:px-6 sm:py-4 border-b border-[#E5DFD5]">
+        <CardTitle className="font-display text-lg font-bold text-[#0F172A]">
+          Invite code
+        </CardTitle>
+        <CardDescription className="text-xs sm:text-sm text-slate-600">
+          Share your code to link with your client.
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="p-5 sm:p-6">
+        {errorMessage && (
+          <div
+            role="alert"
+            aria-live="polite"
+            className="flex items-start gap-2.5 rounded-lg border-[1.5px] border-[#DC2626] bg-[#FEF2F2] p-3 text-xs sm:text-sm text-[#991B1B] mb-4"
+          >
+            <AlertCircle className="size-4 shrink-0 mt-0.5" />
+            <span>{errorMessage}</span>
           </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {linkedClient && link ? (
-            <div className="flex items-center justify-between rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-[var(--color-text)]">
-                    {linkedClient.name}
-                  </span>
-                  <Badge variant="secondary" className="text-[10px]">
-                    {link.status}
-                  </Badge>
-                </div>
-                <span className="text-xs text-[var(--color-muted)] block">
-                  {linkedClient.email}
-                </span>
-              </div>
+        )}
 
-              <div className="text-right">
-                <span className="text-xs text-[var(--color-muted)] block">Rate</span>
-                <span className="text-sm font-semibold text-[var(--color-text)]">
-                  ₱{link.hourlyRate}/hr
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-4 text-left space-y-1">
-              <div className="flex items-center gap-2 text-xs font-medium text-[var(--color-text)]">
-                <Users className="size-3.5 text-[var(--color-muted)]" />
-                <span>Wala pang naka-link na client</span>
-              </div>
-              <p className="text-xs text-[var(--color-muted)]">
-                Ibahagi ang iyong active invite code sa ibaba sa iyong client para ma-link ang kanilang account.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Invite Code Generator Card */}
-      <Card className="border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex size-7 items-center justify-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)]">
-                <Key className="size-4" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-semibold text-[var(--color-text)]">
-                  Invite Code
-                </CardTitle>
-                <CardDescription className="text-xs text-[var(--color-muted)]">
-                  Share this 8-character code with your client
-                </CardDescription>
-              </div>
-            </div>
-
-            {isUsed ? (
-              <Badge
-                variant="outline"
-                className="text-[10px] text-[var(--color-muted)] border-[var(--color-border)]"
-              >
-                Used
-              </Badge>
-            ) : (
-              <Badge
-                variant="secondary"
-                className="text-[10px] text-[var(--color-work)] bg-[var(--color-work-bg)] border-[var(--color-work)]"
-              >
-                Ready to share
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-4 pt-0">
-          {errorMessage && (
-            <div
-              role="alert"
-              className="flex items-start gap-2.5 rounded-md border border-[var(--color-conflict)] bg-[var(--color-conflict-bg)] p-3 text-xs text-[var(--color-conflict)]"
-            >
-              <AlertCircle className="size-4 shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {/* Code Display Box */}
-          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div>
-              <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--color-muted)] block mb-1">
-                {isUsed ? "Previous Code (Used)" : "Active Code"}
-              </span>
-              <span className="font-mono text-xl font-bold tracking-widest text-[var(--color-text)] select-all">
-                {currentCode?.code ?? "No code generated"}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCopy}
-                disabled={!currentCode?.code || isUsed}
-                className="gap-1.5 text-xs font-medium cursor-pointer w-full sm:w-auto"
-              >
-                {copied ? (
-                  <>
-                    <Check className="size-3.5 text-[var(--color-work)]" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="size-3.5" />
-                    <span>Copy code</span>
-                  </>
-                )}
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleGenerate}
-                disabled={isGenerating}
-                className="gap-1.5 text-xs font-medium cursor-pointer w-full sm:w-auto"
-              >
-                <RefreshCw
-                  className={`size-3.5 ${isGenerating ? "animate-spin" : ""}`}
-                />
-                <span>Generate new code</span>
-              </Button>
-            </div>
-          </div>
-
-          <p className="text-[11px] text-[var(--color-muted)] leading-relaxed">
-            {isUsed
-              ? "This code has already been used to link your client and cannot be reused. Generate a new code if you need to provide one to another client."
-              : "Each code is valid for one-time linking. Once your client enters this code, it will be marked as used automatically."}
+        {/* State 1: Active link exists */}
+        {hasActiveLink ? (
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+            Your invite code was used. You&apos;re linked with{" "}
+            <span className="font-bold text-[#0F172A]">
+              {initialLinkedClient?.name ?? "your client"}
+            </span>
+            .
           </p>
-        </CardContent>
-      </Card>
-    </div>
+        ) : hasUnusedCode ? (
+          /* State 2: No active link and an unused code exists */
+          <div className="space-y-4">
+            <div
+              data-testid="invite-code-value"
+              className="font-mono text-2xl sm:text-3xl font-extrabold tracking-widest text-[#0F172A] select-all py-1"
+            >
+              {formatInviteCode(currentCode.code)}
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-600">
+              Your client enters this code to link with you.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+              <Button
+                type="button"
+                data-testid="invite-code-copy"
+                onClick={handleCopy}
+                className="w-full sm:w-auto min-h-[40px] font-bold"
+              >
+                <Copy className="size-4" />
+                <span>Copy code</span>
+              </Button>
+
+              {canShare && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid="invite-code-share"
+                  onClick={handleShare}
+                  className="w-full sm:w-auto min-h-[40px] font-bold"
+                >
+                  <Share2 className="size-4" />
+                  <span>Share</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* State 3: No active link and no unused code */
+          <div className="space-y-4">
+            <p className="text-xs sm:text-sm text-slate-600">
+              Generate an 8-character invite code to share with your client.
+            </p>
+
+            <Button
+              type="button"
+              data-testid="invite-code-generate"
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="w-full sm:w-auto min-h-[40px] font-bold disabled:opacity-40"
+            >
+              {isGenerating ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  <span>Generating code...</span>
+                </span>
+              ) : (
+                <span>Generate invite code</span>
+              )}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
-
