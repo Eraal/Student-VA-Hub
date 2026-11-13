@@ -59,7 +59,7 @@ export function HeroSection() {
 
             {/* Subtext */}
             <p className="text-sm sm:text-base text-slate-700 leading-relaxed max-w-xl">
-              Student VA-Hub checks every task against the student&apos;s class schedule before it&apos;s sent, so work is planned around class time. Fewer clashes, clearer limits, no last-minute surprises.
+              VAwise checks every task against the student&apos;s class schedule before it&apos;s sent, so work is planned around class time. Fewer clashes, clearer limits, no last-minute surprises.
             </p>
 
             {/* CTAs */}

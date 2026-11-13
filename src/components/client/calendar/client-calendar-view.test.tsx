@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { ClientCalendarView } from "./client-calendar-view";
+import { AssignTaskDialog } from "../tasks/assign-task-dialog";
+import { convertTo24Hour } from "@/lib/schedule-utils";
 import type { ClientCalendarData } from "@/lib/services/calendar-service";
 import { TaskStatus } from "@prisma/client";
 
@@ -319,5 +321,61 @@ describe("ClientCalendarView", () => {
       "Maria hasn&#x27;t added free time yet. You can still assign a task and they will see a warning."
     );
     expect(html).toContain("Assign task");
+  });
+
+  describe("Free availability window 24-hour conversion and submission", () => {
+    it("renders free availability window with data-testid calendar-free-window and keeps 12-hour display only for labels", () => {
+      const html = renderToString(
+        <ClientCalendarView initialData={mockCalendarData} />
+      );
+
+      expect(html).toContain('data-testid="calendar-free-window"');
+      expect(html).toContain('data-testid="calendar-open-slot"');
+      // 12-hour display preserved for visible labels
+      expect(html).toContain("6:00 PM – 9:00 PM");
+      expect(html).toContain('data-start="6:00 PM"');
+    });
+
+    it("converts 12-hour time strings from free availability window into 24-hour HH:mm values", () => {
+      expect(convertTo24Hour("6:00 PM")).toBe("18:00");
+      expect(convertTo24Hour("9:00 PM")).toBe("21:00");
+      expect(convertTo24Hour("8:00 AM")).toBe("08:00");
+      expect(convertTo24Hour("12:00 PM")).toBe("12:00");
+      expect(convertTo24Hour("12:00 AM")).toBe("00:00");
+    });
+
+    it("prefills input type=time with 24-hour HH:mm values and enables submit button with valid prefilled values", () => {
+      const start24 = convertTo24Hour("6:00 PM");
+      const end24 = convertTo24Hour("9:00 PM");
+      expect(start24).toBe("18:00");
+      expect(end24).toBe("21:00");
+
+      const html = renderToString(
+        <AssignTaskDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          onSuccess={vi.fn()}
+          linkedStudentName="Maria Santos"
+          defaults={{
+            date: "2026-11-16",
+            start: start24,
+            end: end24,
+            title: "Task with prefilled values",
+          }}
+          initialConflictResult={{
+            ok: true,
+            hasWarnings: false,
+            conflicts: [],
+          }}
+        />
+      );
+
+      // Value in <input type="time"> is 24-hour
+      expect(html).toContain('value="18:00"');
+      expect(html).toContain('value="21:00"');
+      // Submit button is present and not disabled
+      expect(html).toContain('data-testid="assign-submit"');
+      expect(html).not.toMatch(/data-testid="assign-submit"[^>]*disabled/);
+    });
   });
 });

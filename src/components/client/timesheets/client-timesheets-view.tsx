@@ -1047,19 +1047,19 @@ export function ClientTimesheetsView({ initialData }: ClientTimesheetsViewProps)
 
               {/* Parties */}
               <div className="rounded-xl border-[1.5px] border-[#0F172A] bg-white p-4 shadow-[2px_2px_0px_0px_#0F172A] space-y-2.5">
-                <div className="flex justify-between items-center text-xs">
+                <div data-testid="invoice-detail-row" className="flex justify-between items-center text-xs">
                   <span className="text-slate-500 font-medium">Student VA</span>
                   <span className="font-bold text-[#0F172A]">
                     {sheetInvoice.studentName ?? data.linkedStudent.name}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-xs">
+                <div data-testid="invoice-detail-row" className="flex justify-between items-center text-xs">
                   <span className="text-slate-500 font-medium">Client</span>
                   <span className="font-bold text-[#0F172A]">
                     {sheetInvoice.clientName ?? "Client"}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-xs">
+                <div data-testid="invoice-detail-row" className="flex justify-between items-center text-xs">
                   <span className="text-slate-500 font-medium">Payment status</span>
                   <StatusBadge status={sheetInvoice.status} />
                 </div>

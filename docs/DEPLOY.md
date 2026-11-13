@@ -1,6 +1,6 @@
-# Student VA-Hub — Production Deployment Guide
+# VAwise — Production Deployment Guide
 
-This guide details the steps, verification gates, and environment requirements for deploying Student VA-Hub to production environments.
+This guide details the steps, verification gates, and environment requirements for deploying VAwise to production environments.
 
 ---
 
@@ -37,7 +37,7 @@ The following environment variables must be configured in your production hostin
 | :--- | :--- | :--- | :--- |
 | `DATABASE_URL` | Production PostgreSQL connection string | Yes | `postgresql://user:pass@host:5432/db?sslmode=require` |
 | `AUTH_SECRET` | NextAuth secret key for signing JWTs / sessions | Yes | Generate with `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | Canonical URL of the production deployment | Yes | `https://studentvahub.com` |
+| `NEXTAUTH_URL` | Canonical URL of the production deployment | Yes | `https://vawise.com` |
 | `NODE_ENV` | Application environment | Yes | Must be `production` |
 | `NEXT_PUBLIC_SHOW_DEMO_LOGINS` | Dev demo credentials toggle | Optional | **NEVER** set to `"true"` in production. Defaults to false. |
 

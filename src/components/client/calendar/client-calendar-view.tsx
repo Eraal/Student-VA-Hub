@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/lib/labels";
 import { formatHours } from "@/lib/format";
+import { convertTo24Hour, minutesToTimeString } from "@/lib/schedule-utils";
 import { AssignTaskDialog } from "../tasks/assign-task-dialog";
 import type {
   ClientCalendarData,
@@ -79,8 +80,8 @@ export function ClientCalendarView({
   ) => {
     setDialogDefaults({
       date: dateKey,
-      start: startTime || "18:00",
-      end: endTime || "20:00",
+      start: startTime ? convertTo24Hour(startTime) : "18:00",
+      end: endTime ? convertTo24Hour(endTime) : "20:00",
     });
     setIsAssignDialogOpen(true);
   };
@@ -487,8 +488,8 @@ export function ClientCalendarView({
                       const heightPx = Math.max(
                         36,
                         ((cls.endMinutes - cls.startMinutes) / 60) *
-                          HOUR_HEIGHT -
-                          4
+                        HOUR_HEIGHT -
+                        4
                       );
 
                       return (
@@ -530,8 +531,8 @@ export function ClientCalendarView({
                       const heightPx = Math.max(
                         38,
                         ((slot.endMinutes - slot.startMinutes) / 60) *
-                          HOUR_HEIGHT -
-                          4
+                        HOUR_HEIGHT -
+                        4
                       );
                       const durationStr = formatHours(
                         (slot.minutes ?? 0) / 60
@@ -547,8 +548,8 @@ export function ClientCalendarView({
                           onClick={() =>
                             handleOpenAssignWithSlot(
                               day.dateKey,
-                              slot.startTimeFormatted,
-                              slot.endTimeFormatted
+                              minutesToTimeString(slot.startMinutes, true),
+                              minutesToTimeString(slot.endMinutes, true)
                             )
                           }
                           style={{
@@ -561,17 +562,19 @@ export function ClientCalendarView({
                           )}
                           aria-label={`Free window ${day.dayName} ${slot.startTimeFormatted} to ${slot.endTimeFormatted}, assign a task`}
                         >
-                          <div className="flex items-start justify-between gap-1">
-                            <span className="font-bold text-xs truncate block leading-tight text-[#166534]">
-                              {slot.startTimeFormatted} – {slot.endTimeFormatted}
-                            </span>
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-[#166534] opacity-0 group-hover:opacity-100 transition-opacity">
-                              + Assign
+                          <div data-testid="calendar-free-window" className="contents">
+                            <div className="flex items-start justify-between gap-1">
+                              <span className="font-bold text-xs truncate block leading-tight text-[#166534]">
+                                {slot.startTimeFormatted} – {slot.endTimeFormatted}
+                              </span>
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-[#166534] opacity-0 group-hover:opacity-100 transition-opacity">
+                                + Assign
+                              </span>
+                            </div>
+                            <span className="text-[10px] sm:text-[11px] font-semibold text-green-800 truncate block leading-tight mt-0.5">
+                              {durationStr}
                             </span>
                           </div>
-                          <span className="text-[10px] sm:text-[11px] font-semibold text-green-800 truncate block leading-tight mt-0.5">
-                            {durationStr}
-                          </span>
                         </button>
                       );
                     })}
@@ -583,8 +586,8 @@ export function ClientCalendarView({
                       const heightPx = Math.max(
                         38,
                         ((task.endMinutes - task.startMinutes) / 60) *
-                          HOUR_HEIGHT -
-                          4
+                        HOUR_HEIGHT -
+                        4
                       );
 
                       return (
@@ -717,8 +720,8 @@ export function ClientCalendarView({
                   onClick={() =>
                     handleOpenAssignWithSlot(
                       selectedDay.dateKey,
-                      selectedDay.openSlots[0].startTimeFormatted,
-                      selectedDay.openSlots[0].endTimeFormatted
+                      minutesToTimeString(selectedDay.openSlots[0].startMinutes, true),
+                      minutesToTimeString(selectedDay.openSlots[0].endMinutes, true)
                     )
                   }
                   className="bg-[#0F172A] text-white font-bold text-xs h-8 px-3 cursor-pointer hover:bg-slate-800"
@@ -822,30 +825,32 @@ export function ClientCalendarView({
                         data-start={item.startTimeFormatted}
                         className="flex items-center justify-between rounded-xl border-2 border-dashed border-[#16A34A] bg-[#F0FDF4] text-[#166534] p-3 hover:bg-[#DCFCE7] transition-colors"
                       >
-                        <div className="flex items-center gap-2">
-                          <Clock className="size-4 text-[#16A34A]" />
-                          <div>
-                            <span className="font-bold text-xs block text-[#166534]">
-                              Free window ({formatHours((item.minutes ?? 0) / 60)})
-                            </span>
-                            <span className="text-[11px] font-mono text-green-800 font-semibold">
-                              {item.startTimeFormatted} – {item.endTimeFormatted}
-                            </span>
+                        <div data-testid="calendar-free-window" className="contents flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2">
+                            <Clock className="size-4 text-[#16A34A]" />
+                            <div>
+                              <span className="font-bold text-xs block text-[#166534]">
+                                Free window ({formatHours((item.minutes ?? 0) / 60)})
+                              </span>
+                              <span className="text-[11px] font-mono text-green-800 font-semibold">
+                                {item.startTimeFormatted} – {item.endTimeFormatted}
+                              </span>
+                            </div>
                           </div>
+                          <Button
+                            size="xs"
+                            onClick={() =>
+                              handleOpenAssignWithSlot(
+                                selectedDay.dateKey,
+                                minutesToTimeString(item.startMinutes, true),
+                                minutesToTimeString(item.endMinutes, true)
+                              )
+                            }
+                            className="bg-[#0F172A] text-white font-bold text-xs h-7 px-3 cursor-pointer hover:bg-slate-800"
+                          >
+                            Assign
+                          </Button>
                         </div>
-                        <Button
-                          size="xs"
-                          onClick={() =>
-                            handleOpenAssignWithSlot(
-                              selectedDay.dateKey,
-                              item.startTimeFormatted,
-                              item.endTimeFormatted
-                            )
-                          }
-                          className="bg-[#0F172A] text-white font-bold text-xs h-7 px-3 cursor-pointer hover:bg-slate-800"
-                        >
-                          Assign
-                        </Button>
                       </div>
                     );
                   });

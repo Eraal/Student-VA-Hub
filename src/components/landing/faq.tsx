@@ -20,7 +20,7 @@ const FAQS: FAQItem[] = [
   },
   {
     id: "faq-payments",
-    question: "Does Student VA-Hub handle payments?",
+    question: "Does VAwise handle payments?",
     answer:
       "Not yet. The app tracks hours and invoices. Payment is arranged directly between the student and client.",
   },
@@ -63,7 +63,7 @@ export function FAQSection() {
               Frequently asked questions
             </h2>
             <p className="text-sm sm:text-base text-slate-600 max-w-lg mx-auto">
-              Common questions about schedule protection, privacy, and how Student VA-Hub works.
+              Common questions about schedule protection, privacy, and how VAwise works.
             </p>
           </div>
 

@@ -114,11 +114,11 @@ describe("LoginForm Polish & Security Pass", () => {
       expect(html).toContain('aria-label="Show password"');
     });
 
-    it("renders 'Forgot password?' link with data-testid 'login-forgot-link'", () => {
+    it("does not render 'Forgot password?' link", () => {
       const html = renderToString(<LoginForm />);
-      expect(html).toContain('data-testid="login-forgot-link"');
-      expect(html).toContain('href="/forgot-password"');
-      expect(html).toContain("Forgot password?");
+      expect(html).not.toContain('data-testid="login-forgot-link"');
+      expect(html).not.toContain('href="/forgot-password"');
+      expect(html).not.toContain("Forgot password?");
     });
   });
 

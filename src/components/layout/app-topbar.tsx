@@ -59,7 +59,7 @@ export function AppTopbar({ user, unreadCount = 0 }: AppTopbarProps) {
         <Link
           href={isStudent ? "/student" : "/client"}
           className="group flex items-center gap-2 sm:gap-2.5 rounded-lg p-1 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A]"
-          aria-label="Student VA-Hub Dashboard"
+          aria-label="VAwise Dashboard"
         >
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#0F172A] text-white shadow-[2px_2px_0px_0px_#0F172A] transition-transform group-hover:-translate-y-0.5">
             {isStudent ? (
@@ -69,7 +69,7 @@ export function AppTopbar({ user, unreadCount = 0 }: AppTopbarProps) {
             )}
           </div>
           <span className="font-display font-extrabold text-xs sm:text-base tracking-tight text-[#0F172A] truncate">
-            Student VA-Hub
+            VAwise
           </span>
         </Link>
       </div>

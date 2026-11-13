@@ -67,7 +67,7 @@ export function CTAFooter() {
                   <GraduationCap className="size-3.5" />
                 </div>
                 <span className={`${displayFontClass} font-extrabold text-sm text-[#0F172A]`}>
-                  Student VA-Hub
+                  VAwise
                 </span>
               </div>
               <p className="text-xs text-slate-600">
@@ -75,7 +75,7 @@ export function CTAFooter() {
               </p>
             </div>
 
-            {/* Essential Route Links (Login, Register, Forgot Password) */}
+            {/* Essential Route Links (Login, Register) */}
             <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-semibold text-slate-700">
               <Link
                 href="/login"
@@ -89,17 +89,11 @@ export function CTAFooter() {
               >
                 Register
               </Link>
-              <Link
-                href="/forgot-password"
-                className="hover:text-[#0F172A] hover:underline underline-offset-4"
-              >
-                Forgot password
-              </Link>
             </div>
           </div>
 
           <div className="pt-6 border-t border-[#E5DFD5] flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
-            <p>© {new Date().getFullYear()} Student VA-Hub. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} VAwise. All rights reserved.</p>
           </div>
         </LandingContainer>
       </footer>

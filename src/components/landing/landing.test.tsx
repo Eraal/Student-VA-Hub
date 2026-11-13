@@ -28,7 +28,7 @@ describe("Landing Page Polish Pass", () => {
       expect(html).toContain('id="content-faq-privacy"');
       expect(html).toContain("Can clients see my subjects?");
       expect(html).toContain("No. Clients only see an &#x27;In class&#x27; block with the time. Subject names are never shown to them.");
-      expect(html).toContain("Does Student VA-Hub handle payments?");
+      expect(html).toContain("Does VAwise handle payments?");
       expect(html).toContain("How do students and clients connect?");
       expect(html).toContain("Is there a daily limit?");
       // Eyebrow has no icon
@@ -78,7 +78,7 @@ describe("Landing Page Polish Pass", () => {
     it("renders updated copy, ink underline, no pulse icon on eyebrow, and correct button links", () => {
       const html = renderToString(<HeroSection />);
       expect(html).toContain(
-        "Student VA-Hub checks every task against the student&#x27;s class schedule before it&#x27;s sent, so work is planned around class time. Fewer clashes, clearer limits, no last-minute surprises."
+        "VAwise checks every task against the student&#x27;s class schedule before it&#x27;s sent, so work is planned around class time. Fewer clashes, clearer limits, no last-minute surprises."
       );
       // Hero headline SVG underline is ink (text-[#0F172A])
       expect(html).toContain("text-[#0F172A] z-0 overflow-visible");
@@ -135,14 +135,14 @@ describe("Landing Page Polish Pass", () => {
       expect(html).toContain('href="/register?role=CLIENT"');
       expect(html).toContain('href="/login"');
       expect(html).toContain('href="/register"');
-      expect(html).toContain('href="/forgot-password"');
+      expect(html).not.toContain('href="/forgot-password"');
     });
   });
 
   describe("Navbar", () => {
     it("renders navigation links and action buttons", () => {
       const html = renderToString(<LandingNavbar />);
-      expect(html).toContain("Student VA-Hub");
+      expect(html).toContain("VAwise");
       expect(html).toContain('href="/login"');
       expect(html).toContain('href="/register"');
     });

@@ -182,11 +182,11 @@ describe("RegisterForm and AuthLayout Dark Editorial Polish Pass", () => {
       expect(html).toContain("Clients only see busy blocks, never your course or subject names.");
       expect(html).toContain("Verified timesheets.");
       expect(html).toContain("Track Time In/Out and approve hours with automatic invoice totals.");
-      expect(html).toContain("Student VA-Hub · Asia/Manila (UTC+8)");
+      expect(html).toContain("VAwise · Asia/Manila (UTC+8)");
       expect(html).toContain("Back to home");
     });
 
-    it("renders neutral headline for login and forgot-password modes in AuthLayout", () => {
+    it("renders neutral headline for login mode in AuthLayout", () => {
       const htmlLogin = renderToString(
         <AuthLayout mode="login">
           <div>Login Form</div>
@@ -194,13 +194,6 @@ describe("RegisterForm and AuthLayout Dark Editorial Polish Pass", () => {
       );
       expect(htmlLogin).toContain("Pick up right where you left off.");
       expect(htmlLogin).toContain("Your class schedule, available work windows, and timesheets in one place.");
-
-      const htmlForgot = renderToString(
-        <AuthLayout mode="forgot-password">
-          <div>Forgot Password Form</div>
-        </AuthLayout>
-      );
-      expect(htmlForgot).toContain("Pick up right where you left off.");
     });
   });
 

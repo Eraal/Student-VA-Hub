@@ -11,7 +11,7 @@ import { createTaskAction, checkTaskConflictAction } from "@/lib/actions/task";
 import type { ConflictCheckResult } from "@/lib/conflict";
 import { toManilaTimeComponents } from "@/lib/conflict";
 import { suggestSlots, getDayCapacity, type OpenSlot } from "@/lib/open-slots";
-import { minutesToTimeString } from "@/lib/schedule-utils";
+import { minutesToTimeString, convertTo24Hour } from "@/lib/schedule-utils";
 import { formatHours } from "@/lib/format";
 import { toUserErrorMessage } from "@/lib/errors";
 import { toast } from "@/components/ui/toast";
@@ -72,6 +72,7 @@ export interface AssignTaskDialogProps {
     date?: string;
     start?: string;
     end?: string;
+    title?: string;
   };
   scheduleContext?: AssignTaskScheduleContext;
   initialConflictResult?: ConflictCheckResult;
@@ -90,11 +91,11 @@ export function AssignTaskDialog({
   initialConflictResult,
 }: AssignTaskDialogProps) {
   const effectiveDate = defaults?.date || initialDate;
-  const effectiveStart = defaults?.start || initialStartTime;
-  const effectiveEnd = defaults?.end || initialEndTime;
+  const effectiveStart = convertTo24Hour(defaults?.start || initialStartTime || "18:00");
+  const effectiveEnd = convertTo24Hour(defaults?.end || initialEndTime || "20:00");
 
   // Form states
-  const [title, setTitle] = React.useState("");
+  const [title, setTitle] = React.useState(defaults?.title || "");
   const [description, setDescription] = React.useState("");
   const [dateStr, setDateStr] = React.useState(() => {
     return effectiveDate || new Date().toISOString().split("T")[0];
@@ -147,11 +148,11 @@ export function AssignTaskDialog({
   // Reset / initialize state when dialog opens
   React.useEffect(() => {
     if (isOpen) {
-      setTitle("");
+      setTitle(defaults?.title || "");
       setDescription("");
       const date = defaults?.date || initialDate || new Date().toISOString().split("T")[0];
-      const start = defaults?.start || initialStartTime || "18:00";
-      const end = defaults?.end || initialEndTime || "20:00";
+      const start = convertTo24Hour(defaults?.start || initialStartTime || "18:00");
+      const end = convertTo24Hour(defaults?.end || initialEndTime || "20:00");
       setDateStr(date);
       setStartTimeStr(start);
       setEndTimeStr(end);

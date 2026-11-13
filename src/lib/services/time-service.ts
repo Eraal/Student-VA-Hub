@@ -18,6 +18,8 @@ export interface FormattedTimeLog {
   correctionNote: string | null;
   requestedTimeOut: Date | null;
   correctionStatus: CorrectionStatus | null;
+  disputeReason?: string | null;
+  disputeResponse?: string | null;
   createdAt: Date;
 }
 
@@ -75,6 +77,8 @@ export async function getStudentTimeData(studentId: string): Promise<StudentTime
       correctionNote: activeRaw.correctionNote,
       requestedTimeOut: activeRaw.requestedTimeOut,
       correctionStatus: activeRaw.correctionStatus,
+      disputeReason: activeRaw.disputeReason,
+      disputeResponse: activeRaw.disputeResponse,
       createdAt: activeRaw.createdAt,
     }
     : null;
@@ -91,6 +95,8 @@ export async function getStudentTimeData(studentId: string): Promise<StudentTime
     correctionNote: l.correctionNote,
     requestedTimeOut: l.requestedTimeOut,
     correctionStatus: l.correctionStatus,
+    disputeReason: l.disputeReason,
+    disputeResponse: l.disputeResponse,
     createdAt: l.createdAt,
   }));
 

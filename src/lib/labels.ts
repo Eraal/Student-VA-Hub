@@ -235,6 +235,10 @@ export function getStatusMeta(status: AnyStatus): StatusMeta {
   if (status in NOTIFICATION_TYPE_LABELS)
     return NOTIFICATION_TYPE_LABELS[status];
 
+  if (status === "DISPUTED" || status === "disputed") {
+    return { label: "Disputed", tone: "amber" };
+  }
+
   // Fallback for unknown strings
   const readable = status
     .toLowerCase()

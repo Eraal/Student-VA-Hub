@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Student VA-Hub",
-    short_name: "VA-Hub",
+    name: "VAwise",
+    short_name: "VAwise",
     description:
       "Schedule-aware virtual assistant platform for Filipino working students and clients.",
     start_url: "/",

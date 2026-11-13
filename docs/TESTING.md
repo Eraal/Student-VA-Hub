@@ -1,4 +1,4 @@
-# Student VA-Hub — Test IDs Reference
+# VAwise — Test IDs Reference
 
 This document catalogs the `data-testid` attributes used across the application for reliable end-to-end and component testing.
 

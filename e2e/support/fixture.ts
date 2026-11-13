@@ -29,20 +29,37 @@ function prismaForTest() {
   return new PrismaClient();
 }
 
-export function nextWeekday(day: "Mon" | "Tue") {
-  const now = new Date();
-  const manilaNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
-  const target = day === "Mon" ? 1 : 2;
-  const delta = (target - manilaNow.getDay() + 7) % 7 || 7;
-  manilaNow.setDate(manilaNow.getDate() + delta);
-  manilaNow.setHours(0, 0, 0, 0);
-  return manilaNow;
+export type WeekdayName = "Sun" | "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat";
+const WEEKDAY_MAP: Record<WeekdayName, number> = {
+  Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+};
+
+export function nextWeekday(day: WeekdayName) {
+  return manilaDateTime(day, 0, 0);
 }
 
-export function manilaDateTime(day: "Mon" | "Tue", hour: number, minute = 0) {
-  const local = nextWeekday(day);
-  local.setHours(hour, minute, 0, 0);
-  return new Date(local.getTime() - 8 * 60 * 60 * 1000);
+export function manilaDateTime(day: WeekdayName, hour: number, minute = 0) {
+  const target = WEEKDAY_MAP[day];
+  const now = new Date();
+  const manilaMs = now.getTime() + 8 * 3600 * 1000;
+  const manilaDate = new Date(manilaMs);
+  const currentDay = manilaDate.getUTCDay();
+  const delta = (target - currentDay + 7) % 7 || 7;
+  const targetUtcDay = manilaDate.getUTCDate() + delta;
+  const targetYear = manilaDate.getUTCFullYear();
+  const targetMonth = manilaDate.getUTCMonth();
+  // Manila is UTC+8, so UTC hour = hour - 8
+  return new Date(Date.UTC(targetYear, targetMonth, targetUtcDay, hour - 8, minute, 0, 0));
+}
+
+export function relativeDateString(daysFromToday: number) {
+  const now = new Date();
+  const manilaNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Manila" }));
+  manilaNow.setDate(manilaNow.getDate() + daysFromToday);
+  const y = manilaNow.getFullYear();
+  const m = String(manilaNow.getMonth() + 1).padStart(2, "0");
+  const d = String(manilaNow.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export async function resetDb() {
@@ -143,6 +160,63 @@ export async function seedAt5Fixture() {
   });
   await prisma.$disconnect();
   return task;
+}
+
+export async function seedPendingTask(title = "Pending To-Do Task") {
+  const prisma = prismaForTest();
+  const student = await prisma.user.findUniqueOrThrow({ where: { email: credentials.student.email } });
+  const client = await prisma.user.findUniqueOrThrow({ where: { email: credentials.client.email } });
+  const task = await prisma.task.create({
+    data: {
+      clientId: client.id,
+      studentId: student.id,
+      title,
+      description: "Needs student acceptance",
+      startAt: manilaDateTime("Tue", 18),
+      dueAt: manilaDateTime("Tue", 19),
+      estHours: 1,
+      status: TaskStatus.TODO,
+      studentResponse: null,
+    },
+  });
+  await prisma.$disconnect();
+  return task;
+}
+
+export async function seedCorrectionRequest() {
+  const prisma = prismaForTest();
+  const student = await prisma.user.findUniqueOrThrow({ where: { email: credentials.student.email } });
+  const client = await prisma.user.findUniqueOrThrow({ where: { email: credentials.client.email } });
+  const task = await prisma.task.create({
+    data: {
+      clientId: client.id,
+      studentId: student.id,
+      title: "Correction Needed Task",
+      description: "fixture",
+      startAt: manilaDateTime("Mon", 18),
+      dueAt: manilaDateTime("Mon", 20),
+      estHours: 2,
+      status: TaskStatus.DOING,
+      studentResponse: "ACCEPTED",
+    },
+  });
+  const timeIn = manilaDateTime("Mon", 18);
+  const timeOut = manilaDateTime("Mon", 19);
+  const requestedTimeOut = manilaDateTime("Mon", 20);
+  const log = await prisma.timeLog.create({
+    data: {
+      studentId: student.id,
+      taskId: task.id,
+      timeIn,
+      timeOut,
+      totalHours: calculateLoggedHours(timeIn, timeOut),
+      requestedTimeOut,
+      correctionNote: "Forgot to clock out on time due to network disruption",
+      status: TimeLogStatus.CLOSED,
+    },
+  });
+  await prisma.$disconnect();
+  return { task, log };
 }
 
 export async function dbCounts() {

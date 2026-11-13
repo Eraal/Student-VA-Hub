@@ -9,7 +9,7 @@ import { Role } from "@prisma/client";
 export interface AuthLayoutProps {
   children: React.ReactNode;
   role?: Role | null;
-  mode?: "register" | "login" | "forgot-password" | "reset-password";
+  mode?: "register" | "login" | "reset-password";
 }
 
 export function AuthLayout({ children, role, mode = "login" }: AuthLayoutProps) {
@@ -24,7 +24,7 @@ export function AuthLayout({ children, role, mode = "login" }: AuthLayoutProps) 
       headline = "Work around your classes, not through them.";
       subtitle = "Your class schedule is the source of truth—clients can only book your free windows.";
     }
-  } else if (mode === "forgot-password" || mode === "reset-password") {
+  } else if (mode === "reset-password") {
     headline = "Pick up right where you left off.";
     subtitle = "Your class schedule, available work windows, and timesheets in one place.";
   }
@@ -44,13 +44,13 @@ export function AuthLayout({ children, role, mode = "login" }: AuthLayoutProps) 
           <Link
             href="/"
             className="inline-flex items-center gap-2.5 w-fit focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-400 rounded-md"
-            aria-label="Student VA-Hub Home"
+            aria-label="VAwise Home"
           >
             <div className="h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-100 shadow-2xs">
               <GraduationCap className="h-4 w-4" />
             </div>
             <span className={`${displayFontClass} text-sm font-semibold tracking-tight text-white`}>
-              Student VA-Hub
+              VAwise
             </span>
           </Link>
           <Link
@@ -98,7 +98,7 @@ export function AuthLayout({ children, role, mode = "login" }: AuthLayoutProps) 
 
         {/* Bottom Footer */}
         <div className="relative z-10 text-xs text-slate-500 flex items-center justify-between">
-          <span>Student VA-Hub · Asia/Manila (UTC+8)</span>
+          <span>VAwise · Asia/Manila (UTC+8)</span>
         </div>
       </aside>
 
@@ -109,12 +109,12 @@ export function AuthLayout({ children, role, mode = "login" }: AuthLayoutProps) 
           <Link
             href="/"
             className="flex items-center gap-2"
-            aria-label="Student VA-Hub Home"
+            aria-label="VAwise Home"
           >
             <div className="h-7 w-7 rounded-md bg-[#0F172A] text-white flex items-center justify-center shadow-2xs">
               <GraduationCap className="h-4 w-4" />
             </div>
-            <span className={`${displayFontClass} font-semibold text-sm text-[#0F172A]`}>Student VA-Hub</span>
+            <span className={`${displayFontClass} font-semibold text-sm text-[#0F172A]`}>VAwise</span>
           </Link>
           <Link
             href="/"

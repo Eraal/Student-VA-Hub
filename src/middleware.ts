@@ -20,8 +20,13 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
+  // Redirect /forgot-password to /login
+  if (pathname === "/forgot-password") {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
   // 2. Auth pages: redirect already logged-in users to their role page
-  if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") {
+  if (pathname === "/login" || pathname === "/register") {
     if (isLoggedIn) {
       if (role === "STUDENT") {
         return NextResponse.redirect(new URL("/student", req.url));

@@ -79,8 +79,8 @@ export function InviteCodeCard({
     if (!currentCode?.code || !navigator.share) return;
     try {
       await navigator.share({
-        title: "Student VA-Hub Invite Code",
-        text: `Link with me on Student VA-Hub using my invite code: ${currentCode.code}`,
+        title: "VAwise Invite Code",
+        text: `Link with me on VAwise using my invite code: ${currentCode.code}`,
       });
     } catch {
       // User cancelled share dialog or unsupported, ignore

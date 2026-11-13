@@ -1,3 +1,5 @@
+Product name: VAwise (previously Student VA-Hub)
+
 # Student VA-Hub: MVP Spec and Vibe-Coding Plan
 
 Version 1.0 (v1.0 due in one week, v1.1 after)

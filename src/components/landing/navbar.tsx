@@ -42,14 +42,14 @@ export function LandingNavbar() {
         <Link
           href="/"
           className="group flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A] rounded-lg p-1"
-          aria-label="Student VA-Hub Home"
+          aria-label="VAwise Home"
         >
           <div className="flex size-9 items-center justify-center rounded-lg bg-[#0F172A] text-white shadow-[2px_2px_0px_0px_#0F172A] transition-transform group-hover:-translate-y-0.5">
             <GraduationCap className="size-5" />
           </div>
           <div className="flex flex-col">
             <span className={`${displayFontClass} font-extrabold tracking-tight text-[#0F172A] text-base leading-tight`}>
-              Student VA-Hub
+              VAwise
             </span>
           </div>
         </Link>

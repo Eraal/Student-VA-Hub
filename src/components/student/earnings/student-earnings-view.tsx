@@ -262,8 +262,8 @@ export function StudentEarningsView({
                 data-period="this-week"
                 onClick={() => setPeriod("this-week")}
                 className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A] ${period === "this-week"
-                    ? "bg-[#0F172A] text-white shadow-xs"
-                    : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
+                  ? "bg-[#0F172A] text-white shadow-xs"
+                  : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
                   }`}
               >
                 This week
@@ -275,8 +275,8 @@ export function StudentEarningsView({
                 data-period="this-month"
                 onClick={() => setPeriod("this-month")}
                 className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A] ${period === "this-month"
-                    ? "bg-[#0F172A] text-white shadow-xs"
-                    : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
+                  ? "bg-[#0F172A] text-white shadow-xs"
+                  : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
                   }`}
               >
                 This month
@@ -288,8 +288,8 @@ export function StudentEarningsView({
                 data-period="all-time"
                 onClick={() => setPeriod("all-time")}
                 className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F172A] ${period === "all-time"
-                    ? "bg-[#0F172A] text-white shadow-xs"
-                    : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
+                  ? "bg-[#0F172A] text-white shadow-xs"
+                  : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
                   }`}
               >
                 All time
@@ -721,8 +721,8 @@ export function StudentEarningsView({
                     <div className="flex flex-col items-center gap-1.5 relative z-10">
                       <div
                         className={`size-7 rounded-full border-[1.5px] border-[#0F172A] flex items-center justify-center text-xs font-bold shadow-[1px_1px_0px_0px_#0F172A] ${selectedInvoice.status === InvoiceStatus.PENDING
-                            ? "bg-[#0F172A] text-white"
-                            : "bg-[#16A34A] text-white"
+                          ? "bg-[#0F172A] text-white"
+                          : "bg-[#16A34A] text-white"
                           }`}
                       >
                         {selectedInvoice.status === InvoiceStatus.PENDING ? (
@@ -740,10 +740,10 @@ export function StudentEarningsView({
                     <div className="flex flex-col items-center gap-1.5 relative z-10">
                       <div
                         className={`size-7 rounded-full border-[1.5px] border-[#0F172A] flex items-center justify-center text-xs font-bold shadow-[1px_1px_0px_0px_#0F172A] ${selectedInvoice.status === InvoiceStatus.PAID
-                            ? "bg-[#16A34A] text-white"
-                            : selectedInvoice.status === InvoiceStatus.APPROVED
-                              ? "bg-[#0F172A] text-white"
-                              : "bg-white text-slate-400"
+                          ? "bg-[#16A34A] text-white"
+                          : selectedInvoice.status === InvoiceStatus.APPROVED
+                            ? "bg-[#0F172A] text-white"
+                            : "bg-white text-slate-400"
                           }`}
                       >
                         {selectedInvoice.status === InvoiceStatus.PAID ? (
@@ -754,8 +754,8 @@ export function StudentEarningsView({
                       </div>
                       <span
                         className={`text-[10px] font-bold ${selectedInvoice.status !== InvoiceStatus.PENDING
-                            ? "text-[#0F172A]"
-                            : "text-slate-400"
+                          ? "text-[#0F172A]"
+                          : "text-slate-400"
                           }`}
                       >
                         Approved
@@ -766,8 +766,8 @@ export function StudentEarningsView({
                     <div className="flex flex-col items-center gap-1.5 relative z-10">
                       <div
                         className={`size-7 rounded-full border-[1.5px] border-[#0F172A] flex items-center justify-center text-xs font-bold shadow-[1px_1px_0px_0px_#0F172A] ${selectedInvoice.status === InvoiceStatus.PAID
-                            ? "bg-[#16A34A] text-white"
-                            : "bg-white text-slate-400"
+                          ? "bg-[#16A34A] text-white"
+                          : "bg-white text-slate-400"
                           }`}
                       >
                         {selectedInvoice.status === InvoiceStatus.PAID ? (
@@ -778,8 +778,8 @@ export function StudentEarningsView({
                       </div>
                       <span
                         className={`text-[10px] font-bold ${selectedInvoice.status === InvoiceStatus.PAID
-                            ? "text-[#0F172A]"
-                            : "text-slate-400"
+                          ? "text-[#0F172A]"
+                          : "text-slate-400"
                           }`}
                       >
                         Paid
@@ -795,19 +795,19 @@ export function StudentEarningsView({
                   Summary
                 </span>
                 <div className="rounded-xl border-[1.5px] border-[#0F172A] bg-white p-4 shadow-[2px_2px_0px_0px_#0F172A] space-y-3">
-                  <div className="flex items-center justify-between text-xs pb-2 border-b border-[#E5DFD5]">
+                  <div data-testid="invoice-detail-row" className="flex items-center justify-between text-xs pb-2 border-b border-[#E5DFD5]">
                     <span className="text-slate-600 font-medium">Total approved hours</span>
                     <span className="font-bold text-[#0F172A]">
                       {formatHours(selectedInvoice.totalHours)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-xs pb-2 border-b border-[#E5DFD5]">
+                  <div data-testid="invoice-detail-row" className="flex items-center justify-between text-xs pb-2 border-b border-[#E5DFD5]">
                     <span className="text-slate-600 font-medium">Hourly rate</span>
                     <span className="font-bold text-[#0F172A]">
                       {formatPeso(selectedInvoice.rate)}/hr
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-sm pt-1">
+                  <div data-testid="invoice-detail-row" className="flex items-center justify-between text-sm pt-1">
                     <span className="font-bold text-[#0F172A]">Total amount</span>
                     <span className="font-display font-black text-lg text-[#0F172A]">
                       {formatPeso(selectedInvoice.amount)}

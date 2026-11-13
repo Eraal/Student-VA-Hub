@@ -83,6 +83,41 @@ export function timeStringToMinutes(timeStr: string): number {
 }
 
 /**
+ * Converts a 12-hour ("6:00 PM") or 24-hour ("18:00") time string into 24-hour "HH:mm" format.
+ * e.g. "6:00 PM" -> "18:00", "9:30 AM" -> "09:30", "12:00 AM" -> "00:00", "12:00 PM" -> "12:00"
+ */
+export function convertTo24Hour(timeStr: string): string {
+  if (!timeStr) return "";
+  const trimmed = timeStr.trim();
+
+  // 12-hour format with AM/PM (e.g. "6:00 PM", "06:00 PM", "9:30 AM")
+  const match12 = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = parseInt(match12[2], 10);
+    const period = match12[3].toUpperCase();
+
+    if (period === "PM" && hours < 12) {
+      hours += 12;
+    } else if (period === "AM" && hours === 12) {
+      hours = 0;
+    }
+
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  }
+
+  // 24-hour format (e.g. "18:00", "9:30")
+  const match24 = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    const hours = parseInt(match24[1], 10);
+    const minutes = parseInt(match24[2], 10);
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  }
+
+  return trimmed;
+}
+
+/**
  * Converts minutes duration into a readable string.
  * e.g. 60 -> "1 hr", 90 -> "1 hr 30 mins", 120 -> "2 hrs", 45 -> "45 mins"
  */

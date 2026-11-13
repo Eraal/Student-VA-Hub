@@ -3,6 +3,7 @@ import {
   minutesToTimeString,
   timeStringToMinutes,
   minutesToDurationString,
+  convertTo24Hour,
   intervalsOverlap,
   getDayName,
   DAYS_ORDER_ACADEMIC,
@@ -67,6 +68,39 @@ describe("schedule-utils", () => {
       expect(() => timeStringToMinutes("25:00")).toThrow();
       expect(() => timeStringToMinutes("12:65")).toThrow();
       expect(() => timeStringToMinutes("-01:00")).toThrow();
+    });
+  });
+
+  describe("convertTo24Hour", () => {
+    it("converts 12-hour PM strings to 24-hour HH:mm format", () => {
+      expect(convertTo24Hour("6:00 PM")).toBe("18:00");
+      expect(convertTo24Hour("06:00 PM")).toBe("18:00");
+      expect(convertTo24Hour("1:30 PM")).toBe("13:30");
+      expect(convertTo24Hour("11:45 PM")).toBe("23:45");
+      expect(convertTo24Hour("12:00 PM")).toBe("12:00");
+      expect(convertTo24Hour("12:30 PM")).toBe("12:30");
+    });
+
+    it("converts 12-hour AM strings to 24-hour HH:mm format", () => {
+      expect(convertTo24Hour("12:00 AM")).toBe("00:00");
+      expect(convertTo24Hour("12:15 AM")).toBe("00:15");
+      expect(convertTo24Hour("8:00 AM")).toBe("08:00");
+      expect(convertTo24Hour("09:30 AM")).toBe("09:30");
+      expect(convertTo24Hour("11:59 AM")).toBe("11:59");
+    });
+
+    it("leaves 24-hour HH:mm strings untouched or pads single-digit hour", () => {
+      expect(convertTo24Hour("18:00")).toBe("18:00");
+      expect(convertTo24Hour("09:00")).toBe("09:00");
+      expect(convertTo24Hour("9:00")).toBe("09:00");
+      expect(convertTo24Hour("00:00")).toBe("00:00");
+      expect(convertTo24Hour("23:59")).toBe("23:59");
+    });
+
+    it("handles whitespace or empty/invalid inputs gracefully", () => {
+      expect(convertTo24Hour("  6:00 PM  ")).toBe("18:00");
+      expect(convertTo24Hour("")).toBe("");
+      expect(convertTo24Hour("invalid")).toBe("invalid");
     });
   });
 

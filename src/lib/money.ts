@@ -1,5 +1,5 @@
 /**
- * Student VA-Hub — Single Source of Truth for Time & Money Calculations (lib/money.ts)
+ * VAwise — Single Source of Truth for Time & Money Calculations (lib/money.ts)
  *
  * Rules:
  * 1. Bill in whole minutes: duration = Math.round((timeOut - timeIn) / 60000).

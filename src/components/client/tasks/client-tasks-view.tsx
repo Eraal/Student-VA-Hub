@@ -329,16 +329,18 @@ export function ClientTasksView({
                 : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
             )}
           >
-            <span>All</span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                activeTab === "ALL"
-                  ? "bg-white/20 text-white"
-                  : "bg-white border border-[#0F172A]/20 text-slate-700"
-              )}
-            >
-              {countAll}
+            <span data-testid="task-filter-all" className="contents flex items-center gap-2">
+              <span>All</span>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                  activeTab === "ALL"
+                    ? "bg-white/20 text-white"
+                    : "bg-white border border-[#0F172A]/20 text-slate-700"
+                )}
+              >
+                {countAll}
+              </span>
             </span>
           </button>
 
@@ -354,16 +356,18 @@ export function ClientTasksView({
                 : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
             )}
           >
-            <span>To do</span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                activeTab === "TODO"
-                  ? "bg-white/20 text-white"
-                  : "bg-white border border-[#0F172A]/20 text-slate-700"
-              )}
-            >
-              {countTodo}
+            <span data-testid="task-filter-todo" className="contents flex items-center gap-2">
+              <span>To do</span>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                  activeTab === "TODO"
+                    ? "bg-white/20 text-white"
+                    : "bg-white border border-[#0F172A]/20 text-slate-700"
+                )}
+              >
+                {countTodo}
+              </span>
             </span>
           </button>
 
@@ -379,16 +383,20 @@ export function ClientTasksView({
                 : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
             )}
           >
-            <span>In progress</span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                activeTab === "DOING"
-                  ? "bg-white/20 text-white"
-                  : "bg-white border border-[#0F172A]/20 text-slate-700"
-              )}
-            >
-              {countDoing}
+            <span data-testid="task-filter-doing" className="contents flex items-center gap-2">
+              <span data-testid="task-filter-in_progress" className="contents flex items-center gap-2">
+                <span>In progress</span>
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                    activeTab === "DOING"
+                      ? "bg-white/20 text-white"
+                      : "bg-white border border-[#0F172A]/20 text-slate-700"
+                  )}
+                >
+                  {countDoing}
+                </span>
+              </span>
             </span>
           </button>
 
@@ -404,16 +412,18 @@ export function ClientTasksView({
                 : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
             )}
           >
-            <span>Done</span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                activeTab === "DONE"
-                  ? "bg-white/20 text-white"
-                  : "bg-white border border-[#0F172A]/20 text-slate-700"
-              )}
-            >
-              {countDone}
+            <span data-testid="task-filter-done" className="contents flex items-center gap-2">
+              <span>Done</span>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                  activeTab === "DONE"
+                    ? "bg-white/20 text-white"
+                    : "bg-white border border-[#0F172A]/20 text-slate-700"
+                )}
+              >
+                {countDone}
+              </span>
             </span>
           </button>
         </div>

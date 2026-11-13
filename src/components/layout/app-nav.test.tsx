@@ -171,7 +171,7 @@ describe("AppNav / StudentNav / ClientNav shell redesign", () => {
       />
     );
 
-    expect(html).toContain("Student VA-Hub");
+    expect(html).toContain("VAwise");
     expect(html).toContain("Notifications");
     expect(html).toContain("Juan Dela Cruz");
     expect(html).toContain("shrink-0");

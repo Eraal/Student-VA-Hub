@@ -284,7 +284,7 @@ export function TimeLogsList({ logs, hourlyRate = 150, onRefresh }: TimeLogsList
                     <div
                       key={log.id}
                       data-testid="time-log-row"
-                      data-status={log.status}
+                      data-status={log.disputeReason ? "DISPUTED" : log.status}
                       className="rounded-xl border-[1.5px] border-[#0F172A] bg-white p-3.5 sm:p-4 shadow-[2px_2px_0px_0px_#0F172A] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_#0F172A] space-y-2.5"
                     >
                       {/* Responsive row structure: stacks on mobile, horizontal on desktop */}
@@ -304,8 +304,17 @@ export function TimeLogsList({ logs, hourlyRate = 150, onRefresh }: TimeLogsList
                               )}
                             </div>
                             {/* Mobile-only StatusBadge */}
-                            <div className="sm:hidden shrink-0">
-                              <StatusBadge status={log.status} />
+                            <div className="sm:hidden shrink-0 flex items-center gap-1.5 flex-wrap">
+                              {log.disputeReason ? (
+                                <>
+                                  <StatusBadge status="DISPUTED" />
+                                  <span className="text-xs text-[#92400E] font-medium">
+                                    {log.disputeReason}
+                                  </span>
+                                </>
+                              ) : (
+                                <StatusBadge status={log.status} />
+                              )}
                             </div>
                           </div>
 
@@ -337,7 +346,19 @@ export function TimeLogsList({ logs, hourlyRate = 150, onRefresh }: TimeLogsList
                                 {formatPeso(calculateLogAmount(log.totalHours, hourlyRate))}
                               </span>
                             )}
-                            <StatusBadge status={log.status} />
+                            {log.disputeReason ? (
+                              <div className="flex items-center gap-2">
+                                <StatusBadge status="DISPUTED" />
+                                <span
+                                  data-testid="time-dispute-reason"
+                                  className="text-xs text-[#92400E] font-medium"
+                                >
+                                  {log.disputeReason}
+                                </span>
+                              </div>
+                            ) : (
+                              <StatusBadge status={log.status} />
+                            )}
                           </div>
 
                           {/* Correction Status Chip */}
@@ -407,6 +428,14 @@ export function TimeLogsList({ logs, hourlyRate = 150, onRefresh }: TimeLogsList
                               <ChevronDown className="size-3.5" />
                             )}
                           </span>
+                        </div>
+                      )}
+
+                      {/* Client dispute reason / note */}
+                      {log.disputeReason && (
+                        <div className="flex items-start gap-1.5 text-xs text-amber-900 bg-[#FFFBEB] rounded-lg border border-[#D97706]/30 p-2.5 leading-relaxed">
+                          <span className="font-bold text-[#92400E] shrink-0">Client&apos;s note:</span>
+                          <span className="flex-1">{log.disputeReason}</span>
                         </div>
                       )}
                     </div>

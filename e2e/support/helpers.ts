@@ -1,5 +1,14 @@
 import { expect, type Page } from "@playwright/test";
-import { credentials, resetDb, seedFixture } from "./fixture";
+import { credentials, nextWeekday, resetDb, seedFixture, type WeekdayName } from "./fixture";
+
+export function dateNumber(day: WeekdayName) {
+  return String(nextWeekday(day).getDate());
+}
+
+export async function chooseDate(page: Page, day: WeekdayName) {
+  await page.getByTestId("assign-date").click();
+  await page.getByRole("button", { name: dateNumber(day), exact: true }).click();
+}
 
 export async function loginAs(page: Page, role: "student" | "client") {
   const account = credentials[role];

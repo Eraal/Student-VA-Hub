@@ -21,8 +21,17 @@ const bricolage = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Student VA-Hub",
+  title: {
+    default: "VAwise",
+    template: "%s | VAwise",
+  },
   description: "Schedule-aware virtual assistant platform",
+  applicationName: "VAwise",
+  openGraph: {
+    title: "VAwise",
+    description: "Schedule-aware virtual assistant platform",
+    siteName: "VAwise",
+  },
 };
 
 export const viewport: Viewport = {

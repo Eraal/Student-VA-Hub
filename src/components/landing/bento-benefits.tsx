@@ -16,7 +16,7 @@ export function BentoBenefits() {
         {/* Section Heading */}
         <div className="text-center max-w-2xl mx-auto space-y-3">
           <div className="inline-flex items-center rounded-full border-[1.5px] border-[#0F172A] bg-white px-3.5 py-1 text-xs font-bold text-[#0F172A] shadow-[2px_2px_0px_0px_#0F172A]">
-            <span>Why Student VA-Hub?</span>
+            <span>Why VAwise?</span>
           </div>
           <h2 className={`${displayFontClass} text-2xl sm:text-4xl font-extrabold tracking-tight text-[#0F172A] [text-wrap:balance]`}>
             Built for the real lives of working students.

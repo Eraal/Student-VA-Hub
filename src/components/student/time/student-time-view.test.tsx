@@ -250,4 +250,40 @@ describe("StudentTimeView Redesign", () => {
     expect(html).toContain("Accept a task first to start the timer");
     expect(html).toContain('href="/student/tasks"');
   });
+
+  it("renders disputed log with DISPUTED badge, dispute reason, and Client's note", () => {
+    const disputedLog = {
+      id: "log-disputed-1",
+      studentId: "student-1",
+      taskId: "task-1",
+      taskTitle: "Write blog outline",
+      clientName: "Maria Clara",
+      timeIn: new Date("2026-11-11T02:00:00.000Z"),
+      timeOut: new Date("2026-11-11T05:00:00.000Z"),
+      totalHours: 3,
+      status: TimeLogStatus.CLOSED,
+      disputeReason: "Deliverables did not match requirements",
+      correctionNote: null,
+      requestedTimeOut: null,
+      correctionStatus: null,
+      createdAt: new Date("2026-11-11T02:00:00.000Z"),
+    };
+
+    const html = renderToString(
+      <StudentTimeView
+        initialData={{
+          ...sampleData,
+          logs: [disputedLog],
+        }}
+        availableTasks={sampleTasks}
+        maxHoursPerDay={4}
+      />
+    );
+
+    expect(html).toContain('data-status="DISPUTED"');
+    expect(html).toContain("Disputed");
+    expect(html).toContain('data-testid="time-dispute-reason"');
+    expect(html).toContain("Deliverables did not match requirements");
+    expect(html).toContain("Client&#x27;s note:");
+  });
 });

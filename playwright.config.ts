@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+if (!process.env.TEST_DATABASE_URL) {
+  process.env.TEST_DATABASE_URL = "postgresql://postgres:admin@127.0.0.1:5432/student_va_hub_test";
+}
+
 const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100";
 
 export default defineConfig({

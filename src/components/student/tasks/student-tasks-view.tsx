@@ -145,10 +145,10 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
       prev.map((t) =>
         t.id === taskId
           ? {
-              ...t,
-              studentResponse: StudentResponse.RESCHEDULE_REQUESTED,
-              rescheduleReason: reason,
-            }
+            ...t,
+            studentResponse: StudentResponse.RESCHEDULE_REQUESTED,
+            rescheduleReason: reason,
+          }
           : t
       )
     );
@@ -278,16 +278,18 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
                 : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
             )}
           >
-            <span>All</span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                activeTab === "ALL"
-                  ? "bg-white/20 text-white"
-                  : "bg-white border border-[#0F172A]/20 text-slate-700"
-              )}
-            >
-              {countAll}
+            <span data-testid="task-filter-all" className="contents flex items-center gap-2">
+              <span>All</span>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                  activeTab === "ALL"
+                    ? "bg-white/20 text-white"
+                    : "bg-white border border-[#0F172A]/20 text-slate-700"
+                )}
+              >
+                {countAll}
+              </span>
             </span>
           </button>
 
@@ -303,16 +305,18 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
                 : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
             )}
           >
-            <span>To do</span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                activeTab === "TODO"
-                  ? "bg-white/20 text-white"
-                  : "bg-white border border-[#0F172A]/20 text-slate-700"
-              )}
-            >
-              {countTodo}
+            <span data-testid="task-filter-todo" className="contents flex items-center gap-2">
+              <span>To do</span>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                  activeTab === "TODO"
+                    ? "bg-white/20 text-white"
+                    : "bg-white border border-[#0F172A]/20 text-slate-700"
+                )}
+              >
+                {countTodo}
+              </span>
             </span>
           </button>
 
@@ -328,16 +332,20 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
                 : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
             )}
           >
-            <span>In progress</span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                activeTab === "DOING"
-                  ? "bg-white/20 text-white"
-                  : "bg-white border border-[#0F172A]/20 text-slate-700"
-              )}
-            >
-              {countDoing}
+            <span data-testid="task-filter-doing" className="contents flex items-center gap-2">
+              <span data-testid="task-filter-in_progress" className="contents flex items-center gap-2">
+                <span>In progress</span>
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                    activeTab === "DOING"
+                      ? "bg-white/20 text-white"
+                      : "bg-white border border-[#0F172A]/20 text-slate-700"
+                  )}
+                >
+                  {countDoing}
+                </span>
+              </span>
             </span>
           </button>
 
@@ -353,16 +361,18 @@ export function StudentTasksView({ initialTasks }: StudentTasksViewProps) {
                 : "text-slate-600 hover:text-[#0F172A] hover:bg-white/60"
             )}
           >
-            <span>Done</span>
-            <span
-              className={cn(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                activeTab === "DONE"
-                  ? "bg-white/20 text-white"
-                  : "bg-white border border-[#0F172A]/20 text-slate-700"
-              )}
-            >
-              {countDone}
+            <span data-testid="task-filter-done" className="contents flex items-center gap-2">
+              <span>Done</span>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                  activeTab === "DONE"
+                    ? "bg-white/20 text-white"
+                    : "bg-white border border-[#0F172A]/20 text-slate-700"
+                )}
+              >
+                {countDone}
+              </span>
             </span>
           </button>
         </div>
@@ -856,11 +866,11 @@ function TaskCard({
                 .hasConflict ||
                 (task as unknown as { hasConflict?: boolean; overlapsClass?: boolean })
                   .overlapsClass) && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-[#D97706] bg-[#FFFBEB] px-2 py-0.5 text-[11px] font-bold text-[#92400E] shadow-[1.5px_1.5px_0px_0px_#D97706]">
-                  <AlertTriangle className="size-3" />
-                  Overlaps a class
-                </span>
-              )}
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[#D97706] bg-[#FFFBEB] px-2 py-0.5 text-[11px] font-bold text-[#92400E] shadow-[1.5px_1.5px_0px_0px_#D97706]">
+                    <AlertTriangle className="size-3" />
+                    Overlaps a class
+                  </span>
+                )}
             </div>
           </div>
 

@@ -200,21 +200,12 @@ export function LoginForm() {
 
         {/* Password field */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label
-              htmlFor="login-password"
-              className="block text-xs font-medium text-slate-700"
-            >
-              Password
-            </label>
-            <Link
-              href="/forgot-password"
-              data-testid="login-forgot-link"
-              className="text-xs font-medium text-slate-500 hover:text-[#0F172A] hover:underline transition-colors"
-            >
-              Forgot password?
-            </Link>
-          </div>
+          <label
+            htmlFor="login-password"
+            className="block text-xs font-medium text-slate-700 mb-1.5"
+          >
+            Password
+          </label>
           <div className="relative">
             <input
               id="login-password"

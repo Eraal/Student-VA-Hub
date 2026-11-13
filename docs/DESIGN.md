@@ -1,4 +1,4 @@
-# Student VA-Hub — Design System Specification
+# VAwise — Design System Specification
 
 > **Status:** Approved Source of Truth  
 > **Visual Reference:** The Landing Page (`src/app/page.tsx`, `src/components/landing/*`)  
