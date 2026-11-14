@@ -9,21 +9,21 @@ export interface ActiveTimeLogSummary {
 
 export type TaskTimeActionState =
   | {
-      type: "RUNNING";
-      elapsedFormatted: string;
-      activeLogId: string;
-    }
+    type: "RUNNING";
+    elapsedFormatted: string;
+    activeLogId: string;
+  }
   | {
-      type: "BLOCKED_BY_OTHER_SESSION";
-      reason: string;
-    }
+    type: "BLOCKED_BY_OTHER_SESSION";
+    reason: string;
+  }
   | {
-      type: "CAN_TIME_IN";
-      href: string;
-    }
+    type: "CAN_TIME_IN";
+    href: string;
+  }
   | {
-      type: "NONE";
-    };
+    type: "NONE";
+  };
 
 /**
  * Formats elapsed duration between timeIn and now into a clean human string (e.g. "15m", "1h 12m", "45s").
