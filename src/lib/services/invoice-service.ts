@@ -7,8 +7,19 @@ import {
   calculateLogAmount,
   sumMoney,
   hoursToMinutes,
+  calculateTotalAmountFromLogs,
 } from "../money";
 import { formatHours, formatPeso } from "../format";
+
+export interface InvoiceLineItem {
+  id: string;
+  timeIn: Date;
+  timeOut: Date | null;
+  totalHours: number;
+  taskTitle: string;
+  sessionNote?: string | null;
+  amount: number;
+}
 
 export interface FormattedInvoice {
   id: string;
@@ -22,6 +33,7 @@ export interface FormattedInvoice {
   status: InvoiceStatus;
   createdAt: Date;
   updatedAt: Date;
+  lineItems?: InvoiceLineItem[];
 }
 
 export interface ClientTimesheetData {
@@ -128,6 +140,21 @@ export async function getClientTimesheetData(clientId: string): Promise<ClientTi
       include: {
         student: { select: { name: true } },
         client: { select: { name: true } },
+        timeLogs: {
+          select: {
+            id: true,
+            timeIn: true,
+            timeOut: true,
+            totalHours: true,
+            correctionNote: true,
+            task: {
+              select: {
+                title: true,
+              },
+            },
+          },
+          orderBy: { timeIn: "asc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     }),
@@ -169,19 +196,35 @@ export async function getClientTimesheetData(clientId: string): Promise<ClientTi
       status: l.status,
     }));
 
-  const invoices: FormattedInvoice[] = invoicesRaw.map((inv) => ({
-    id: inv.id,
-    studentId: inv.studentId,
-    clientId: inv.clientId,
-    studentName: inv.student.name,
-    clientName: inv.client.name,
-    totalHours: inv.totalHours,
-    rate: inv.rate,
-    amount: inv.amount,
-    status: inv.status,
-    createdAt: inv.createdAt,
-    updatedAt: inv.updatedAt,
-  }));
+  const invoices: FormattedInvoice[] = invoicesRaw.map((inv) => {
+    const lineItems: InvoiceLineItem[] = (inv.timeLogs ?? []).map((tl) => ({
+      id: tl.id,
+      timeIn: tl.timeIn,
+      timeOut: tl.timeOut,
+      totalHours: tl.totalHours ?? 0,
+      taskTitle: tl.task.title,
+      sessionNote: tl.correctionNote,
+      amount: calculateLogAmount(tl.totalHours, inv.rate),
+    }));
+
+    const computedAmount =
+      lineItems.length > 0 ? sumMoney(lineItems.map((l) => l.amount)) : inv.amount;
+
+    return {
+      id: inv.id,
+      studentId: inv.studentId,
+      clientId: inv.clientId,
+      studentName: inv.student.name,
+      clientName: inv.client.name,
+      totalHours: inv.totalHours,
+      rate: inv.rate,
+      amount: computedAmount,
+      status: inv.status,
+      createdAt: inv.createdAt,
+      updatedAt: inv.updatedAt,
+      lineItems,
+    };
+  });
 
   const pendingHours = pendingLogs.reduce((acc, l) => acc + l.totalHours, 0);
   const approvedHours = approvedLogs.reduce((acc, l) => acc + l.totalHours, 0);
@@ -258,8 +301,21 @@ export async function approveTimeLog(clientId: string, timeLogId: string) {
 
     let invoice;
     if (existingInvoice) {
-      const newTotalHours = Math.round((existingInvoice.totalHours + logHours) * 60) / 60;
-      const newAmount = sumMoney([existingInvoice.amount, logAmount]);
+      const existingLogs = await tx.timeLog.findMany({
+        where: { invoiceId: existingInvoice.id },
+        select: { totalHours: true },
+      });
+      let newTotalHours: number;
+      let newAmount: number;
+
+      if (existingLogs.length > 0) {
+        const allLogs = [...existingLogs, { totalHours: logHours }];
+        newTotalHours = Math.round(allLogs.reduce((acc, l) => acc + (l.totalHours ?? 0), 0) * 60) / 60;
+        newAmount = calculateTotalAmountFromLogs(allLogs, rate);
+      } else {
+        newTotalHours = Math.round((existingInvoice.totalHours + logHours) * 60) / 60;
+        newAmount = sumMoney([existingInvoice.amount, logAmount]);
+      }
 
       invoice = await tx.invoice.update({
         where: { id: existingInvoice.id },
@@ -281,6 +337,11 @@ export async function approveTimeLog(clientId: string, timeLogId: string) {
         },
       });
     }
+
+    await tx.timeLog.update({
+      where: { id: timeLogId },
+      data: { invoiceId: invoice.id },
+    });
 
     const clientUser = await tx.user.findUnique({
       where: { id: clientId },
@@ -539,24 +600,55 @@ export async function getStudentEarningsData(studentId: string): Promise<Student
       include: {
         student: { select: { name: true } },
         client: { select: { name: true } },
+        timeLogs: {
+          select: {
+            id: true,
+            timeIn: true,
+            timeOut: true,
+            totalHours: true,
+            correctionNote: true,
+            task: {
+              select: {
+                title: true,
+              },
+            },
+          },
+          orderBy: { timeIn: "asc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     }),
   ]);
 
-  const invoices: FormattedInvoice[] = invoicesRaw.map((inv) => ({
-    id: inv.id,
-    studentId: inv.studentId,
-    clientId: inv.clientId,
-    studentName: inv.student.name,
-    clientName: inv.client.name,
-    totalHours: inv.totalHours,
-    rate: inv.rate,
-    amount: inv.amount,
-    status: inv.status,
-    createdAt: inv.createdAt,
-    updatedAt: inv.updatedAt,
-  }));
+  const invoices: FormattedInvoice[] = invoicesRaw.map((inv) => {
+    const lineItems: InvoiceLineItem[] = (inv.timeLogs ?? []).map((tl) => ({
+      id: tl.id,
+      timeIn: tl.timeIn,
+      timeOut: tl.timeOut,
+      totalHours: tl.totalHours ?? 0,
+      taskTitle: tl.task.title,
+      sessionNote: tl.correctionNote,
+      amount: calculateLogAmount(tl.totalHours, inv.rate),
+    }));
+
+    const computedAmount =
+      lineItems.length > 0 ? sumMoney(lineItems.map((l) => l.amount)) : inv.amount;
+
+    return {
+      id: inv.id,
+      studentId: inv.studentId,
+      clientId: inv.clientId,
+      studentName: inv.student.name,
+      clientName: inv.client.name,
+      totalHours: inv.totalHours,
+      rate: inv.rate,
+      amount: computedAmount,
+      status: inv.status,
+      createdAt: inv.createdAt,
+      updatedAt: inv.updatedAt,
+      lineItems,
+    };
+  });
 
   let totalApprovedHours = 0;
   let totalPendingHours = 0;

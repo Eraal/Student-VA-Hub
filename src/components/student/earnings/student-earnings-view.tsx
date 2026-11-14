@@ -20,6 +20,7 @@ import { calculateLogAmount, sumMoney } from "@/lib/money";
 import { toZonedTime } from "date-fns-tz";
 import { startOfWeek, startOfMonth } from "date-fns";
 import { Eye, Check, Clock } from "lucide-react";
+import { InvoiceLineItemsTable } from "@/components/invoice/invoice-line-items-table";
 
 export type PeriodType = "this-week" | "this-month" | "all-time";
 
@@ -679,15 +680,18 @@ export function StudentEarningsView({
         <SheetContent
           side="responsive"
           data-testid="invoice-sheet"
-          className="w-full sm:max-w-md space-y-6 focus:outline-none"
+          className="w-full sm:max-w-lg space-y-6 focus:outline-none"
         >
           {selectedInvoice && (
             <>
               {/* Header */}
-              <SheetHeader className="space-y-2 pr-8">
-                <div className="flex items-center gap-2">
-                  <SheetTitle>Invoice</SheetTitle>
+              <SheetHeader className="border-b border-[#E5DFD5] pb-4 pr-14 space-y-1.5 text-left">
+                <div className="flex flex-wrap items-center gap-2">
+                  <SheetTitle className="font-display text-2xl font-bold text-[#0F172A]">Invoice</SheetTitle>
                   <StatusBadge status={selectedInvoice.status} />
+                </div>
+                <div className="font-display text-2xl font-black text-[#0F172A]">
+                  {formatPeso(selectedInvoice.amount)}
                 </div>
                 <SheetDescription className="text-xs text-slate-600">
                   Issued {formatDate(selectedInvoice.createdAt)} &middot; Client:{" "}
@@ -815,6 +819,13 @@ export function StudentEarningsView({
                   </div>
                 </div>
               </div>
+
+              {/* Itemized Work Table */}
+              <InvoiceLineItemsTable
+                lineItems={selectedInvoice.lineItems}
+                totalHours={selectedInvoice.totalHours}
+                totalAmount={selectedInvoice.amount}
+              />
 
               {/* Note for Approved status */}
               {selectedInvoice.status === InvoiceStatus.APPROVED && (

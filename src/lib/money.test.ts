@@ -125,6 +125,64 @@ describe("lib/money.ts — Single Source of Truth for Time & Money", () => {
       const tOut45s = new Date("2026-11-16T10:00:45.000Z");
       expect(calculateLoggedMinutes(tIn, tOut45s)).toBe(1);
     });
+
+    it("calculates three 20-minute sessions at ₱150/hr to equal ₱50.00 each and ₱150.00 total", () => {
+      // 20 minutes = 20/60 = 0.3333... hours
+      const h20m = 20 / 60;
+      const rate = 150;
+
+      const session1 = calculateLogAmount(h20m, rate);
+      const session2 = calculateLogAmount(h20m, rate);
+      const session3 = calculateLogAmount(h20m, rate);
+
+      expect(session1).toBe(50.0);
+      expect(session2).toBe(50.0);
+      expect(session3).toBe(50.0);
+
+      const total = sumMoney([session1, session2, session3]);
+      expect(total).toBe(150.0);
+
+      const totalFromLogs = calculateTotalAmountFromLogs(
+        [{ totalHours: h20m }, { totalHours: h20m }, { totalHours: h20m }],
+        rate
+      );
+      expect(totalFromLogs).toBe(150.0);
+      expect(totalFromLogs).toBe(total);
+    });
+
+    it("calculates 31 minutes at ₱150/hr to give ₱77.50", () => {
+      // 31 minutes = 31/60 hours. 31 * 15000 / 60 = 7750 centavos = ₱77.50
+      const h31m = 31 / 60;
+      const rate = 150;
+
+      const amount = calculateLogAmount(h31m, rate);
+      expect(amount).toBe(77.5);
+    });
+
+    it("enforces that invoice amount is the sum of rounded line amounts when per-log rounding differs (e.g. 3 x 20m @ ₱160/hr = ₱159.99)", () => {
+      // 20 min @ ₱160/hr: Math.round(20 * 16000 / 60) = 5333 centavos = ₱53.33
+      const h20m = 20 / 60;
+      const rate = 160;
+
+      const line1 = calculateLogAmount(h20m, rate);
+      const line2 = calculateLogAmount(h20m, rate);
+      const line3 = calculateLogAmount(h20m, rate);
+
+      expect(line1).toBe(53.33);
+      expect(line2).toBe(53.33);
+      expect(line3).toBe(53.33);
+
+      const lineItemsSum = sumMoney([line1, line2, line3]);
+      expect(lineItemsSum).toBe(159.99);
+
+      const invoiceAmount = calculateTotalAmountFromLogs(
+        [{ totalHours: h20m }, { totalHours: h20m }, { totalHours: h20m }],
+        rate
+      );
+      // Invoice total must equal the sum of rounded line amounts exactly
+      expect(invoiceAmount).toBe(159.99);
+      expect(invoiceAmount).toBe(lineItemsSum);
+    });
   });
 
   describe("2. Batch approval & accumulation equality", () => {

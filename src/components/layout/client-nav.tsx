@@ -7,6 +7,7 @@ import {
   Calendar,
   CheckSquare,
   FileText,
+  BarChart3,
 } from "lucide-react";
 
 export const clientNavItems: NavItemConfig[] = [
@@ -39,6 +40,13 @@ export const clientNavItems: NavItemConfig[] = [
     exact: false,
     icon: FileText,
     badgeType: "timesheets",
+  },
+  {
+    id: "reports",
+    name: "Reports",
+    href: "/client/reports",
+    exact: false,
+    icon: BarChart3,
   },
 ];
 

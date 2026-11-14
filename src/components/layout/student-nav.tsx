@@ -8,6 +8,7 @@ import {
   CheckSquare,
   Clock,
   Wallet,
+  BarChart3,
 } from "lucide-react";
 
 export const studentNavItems: NavItemConfig[] = [
@@ -47,6 +48,13 @@ export const studentNavItems: NavItemConfig[] = [
     href: "/student/earnings",
     exact: false,
     icon: Wallet,
+  },
+  {
+    id: "reports",
+    name: "Reports",
+    href: "/student/reports",
+    exact: false,
+    icon: BarChart3,
   },
 ];
 

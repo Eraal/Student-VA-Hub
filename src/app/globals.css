@@ -239,3 +239,54 @@
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* ==========================================================================
+   Print Stylesheet for Clean A4 Output
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm 15mm;
+  }
+
+  aside,
+  nav,
+  header,
+  [data-testid="app-topbar"],
+  [aria-label="Sidebar Navigation"],
+  [aria-label="Mobile Navigation"],
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0F172A !important;
+    font-size: 11pt !important;
+    overflow: visible !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .shadow-\[3px_3px_0px_0px_\#0F172A\],
+  .shadow-\[2px_2px_0px_0px_\#0F172A\],
+  .shadow-\[1\.5px_1\.5px_0px_0px_\#0F172A\] {
+    box-shadow: none !important;
+  }
+
+  table,
+  tr,
+  td,
+  th,
+  [data-testid^="report-tile"] {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+

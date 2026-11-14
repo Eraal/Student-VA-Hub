@@ -176,6 +176,12 @@ describe("invoice-service", () => {
       expect(invoice.amount).toBe(450);
       createdInvoiceIds.push(invoice.id);
 
+      // Verify time log is linked to the invoice
+      const updatedLog = await prisma.timeLog.findUnique({
+        where: { id: testLogId },
+      });
+      expect(updatedLog?.invoiceId).toBe(invoice.id);
+
       // Verify notification for student
       const notifApproved = await prisma.notification.findFirst({
         where: { userId: testStudentId, type: "HOURS_APPROVED" },
@@ -221,6 +227,115 @@ describe("invoice-service", () => {
       await expect(markInvoicePaid(testClientId, invoice.id)).rejects.toThrow(
         "Only an approved invoice can be marked as paid",
       );
+    });
+  });
+
+  describe("Invoice Line Items & Centavo Rounding", () => {
+    it("accumulates three 20-minute sessions (150/hr) and one 31-minute session (150/hr), linking all logs and matching line sum", async () => {
+      const log1 = await prisma.timeLog.create({
+        data: {
+          studentId: testStudentId,
+          taskId: testTaskId,
+          timeIn: new Date("2026-11-17T01:00:00.000Z"),
+          timeOut: new Date("2026-11-17T01:20:00.000Z"),
+          totalHours: 20 / 60,
+          status: TimeLogStatus.CLOSED,
+          correctionNote: "First 20m sprint",
+        },
+      });
+      const log2 = await prisma.timeLog.create({
+        data: {
+          studentId: testStudentId,
+          taskId: testTaskId,
+          timeIn: new Date("2026-11-17T02:00:00.000Z"),
+          timeOut: new Date("2026-11-17T02:20:00.000Z"),
+          totalHours: 20 / 60,
+          status: TimeLogStatus.CLOSED,
+          correctionNote: "Second 20m sprint",
+        },
+      });
+      const log3 = await prisma.timeLog.create({
+        data: {
+          studentId: testStudentId,
+          taskId: testTaskId,
+          timeIn: new Date("2026-11-17T03:00:00.000Z"),
+          timeOut: new Date("2026-11-17T03:20:00.000Z"),
+          totalHours: 20 / 60,
+          status: TimeLogStatus.CLOSED,
+          correctionNote: "Third 20m sprint",
+        },
+      });
+      const log4 = await prisma.timeLog.create({
+        data: {
+          studentId: testStudentId,
+          taskId: testTaskId,
+          timeIn: new Date("2026-11-17T04:00:00.000Z"),
+          timeOut: new Date("2026-11-17T04:31:00.000Z"),
+          totalHours: 31 / 60,
+          status: TimeLogStatus.CLOSED,
+          correctionNote: "Final 31m wrap-up",
+        },
+      });
+
+      // Approve in sequence
+      const res1 = await approveTimeLog(testClientId, log1.id);
+      createdInvoiceIds.push(res1.invoice.id);
+      expect(res1.invoice.amount).toBe(50.0); // 20m @ 150/hr = 50.00
+
+      const res2 = await approveTimeLog(testClientId, log2.id);
+      expect(res2.invoice.id).toBe(res1.invoice.id);
+      expect(res2.invoice.amount).toBe(100.0); // 50 + 50 = 100.00
+
+      const res3 = await approveTimeLog(testClientId, log3.id);
+      expect(res3.invoice.id).toBe(res1.invoice.id);
+      expect(res3.invoice.amount).toBe(150.0); // 50 + 50 + 50 = 150.00
+
+      const res4 = await approveTimeLog(testClientId, log4.id);
+      expect(res4.invoice.id).toBe(res1.invoice.id);
+      // 31m @ 150/hr is 77.50, so 150.00 + 77.50 = 227.50
+      expect(res4.invoice.amount).toBe(227.5);
+
+      // Verify all 4 logs have invoiceId set
+      const allLogs = await prisma.timeLog.findMany({
+        where: { id: { in: [log1.id, log2.id, log3.id, log4.id] } },
+      });
+      expect(allLogs.every((l) => l.invoiceId === res1.invoice.id)).toBe(true);
+
+      // Verify getClientTimesheetData returns itemized lines
+      const timesheetData = await getClientTimesheetData(testClientId);
+      const invoiceData = timesheetData.invoices.find((i) => i.id === res1.invoice.id);
+      expect(invoiceData).toBeDefined();
+      expect(invoiceData?.lineItems).toHaveLength(4);
+      expect(invoiceData?.lineItems?.map((li) => li.amount)).toEqual([50.0, 50.0, 50.0, 77.5]);
+      expect(invoiceData?.amount).toBe(227.5);
+
+      // Verify getStudentEarningsData returns itemized lines
+      const earningsData = await getStudentEarningsData(testStudentId);
+      const studentInvoice = earningsData.invoices.find((i) => i.id === res1.invoice.id);
+      expect(studentInvoice).toBeDefined();
+      expect(studentInvoice?.lineItems).toHaveLength(4);
+      expect(studentInvoice?.amount).toBe(227.5);
+    });
+
+    it("handles legacy invoices without linked time logs gracefully", async () => {
+      const legacyInvoice = await prisma.invoice.create({
+        data: {
+          studentId: testStudentId,
+          clientId: testClientId,
+          totalHours: 2.0,
+          rate: 150,
+          amount: 300,
+          status: InvoiceStatus.APPROVED,
+        },
+      });
+      createdInvoiceIds.push(legacyInvoice.id);
+
+      const timesheetData = await getClientTimesheetData(testClientId);
+      const found = timesheetData.invoices.find((i) => i.id === legacyInvoice.id);
+      expect(found).toBeDefined();
+      expect(found?.lineItems).toEqual([]);
+      expect(found?.amount).toBe(300);
+      expect(found?.totalHours).toBe(2.0);
     });
   });
 

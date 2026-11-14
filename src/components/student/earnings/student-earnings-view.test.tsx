@@ -166,6 +166,40 @@ describe("StudentEarningsView Redesign", () => {
     expect(html).not.toContain("Make Payment");
   });
 
+  it("renders invoice Sheet with itemized line items when available", () => {
+    const invoiceWithLines = {
+      ...sampleData.invoices[1],
+      lineItems: [
+        {
+          id: "tl-s1",
+          timeIn: new Date("2026-11-11T02:00:00.000Z"),
+          timeOut: new Date("2026-11-11T04:00:00.000Z"),
+          totalHours: 2.0,
+          taskTitle: "Research Competitor Pricing Analysis",
+          sessionNote: "Checked top 3 platforms",
+          amount: 300,
+        },
+      ],
+    };
+
+    const html = renderToString(
+      <StudentEarningsView
+        initialData={sampleData}
+        loggedHours={sampleLogs}
+        initialSelectedInvoice={invoiceWithLines}
+        initialSheetOpen={true}
+      />
+    );
+
+    expect(html).toContain('data-testid="invoice-sheet"');
+    expect(html).toContain("Itemized Work");
+    expect(html).toContain('data-testid="invoice-detail-row"');
+    expect(html).toContain("Research Competitor Pricing Analysis");
+    expect(html).toContain("Checked top 3 platforms");
+    expect(html).toContain('data-testid="invoice-detail-total"');
+    expect(html).toContain("₱300.00");
+  });
+
   it("renders By Task section with task titles, sessions in normal ink, hours, Value (not Earned), and total footer", () => {
     const html = renderToString(
       <StudentEarningsView initialData={sampleData} loggedHours={sampleLogs} />

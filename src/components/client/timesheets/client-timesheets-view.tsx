@@ -28,6 +28,7 @@ import { calculateLogAmount, calculateLoggedMinutes, sumMoney } from "@/lib/mone
 import { toUserErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { DisputeDialog, DisputeLogInfo } from "./dispute-dialog";
+import { InvoiceLineItemsTable } from "@/components/invoice/invoice-line-items-table";
 import {
   Dialog,
   DialogContent,
@@ -60,11 +61,15 @@ import {
 
 interface ClientTimesheetsViewProps {
   initialData: ClientTimesheetData;
+  initialSheetInvoice?: FormattedInvoice | null;
 }
 
 type TabType = "to-review" | "approved" | "invoices";
 
-export function ClientTimesheetsView({ initialData }: ClientTimesheetsViewProps) {
+export function ClientTimesheetsView({
+  initialData,
+  initialSheetInvoice = null,
+}: ClientTimesheetsViewProps) {
   const router = useRouter();
   const [data, setData] = React.useState<ClientTimesheetData>(initialData);
   const [activeTab, setActiveTab] = React.useState<TabType>("to-review");
@@ -83,7 +88,9 @@ export function ClientTimesheetsView({ initialData }: ClientTimesheetsViewProps)
   );
 
   // Invoice detail sheet state
-  const [sheetInvoice, setSheetInvoice] = React.useState<FormattedInvoice | null>(null);
+  const [sheetInvoice, setSheetInvoice] = React.useState<FormattedInvoice | null>(
+    initialSheetInvoice
+  );
 
   React.useEffect(() => {
     setData(initialData);
@@ -1006,16 +1013,16 @@ export function ClientTimesheetsView({ initialData }: ClientTimesheetsViewProps)
       >
         <SheetContent
           data-testid="invoice-sheet"
-          className="w-full sm:max-w-md border-l-[1.5px] border-[#0F172A] bg-white p-6 shadow-[-4px_0px_0px_0px_#0F172A] space-y-6 overflow-y-auto"
+          className="w-full sm:max-w-lg border-l-[1.5px] border-[#0F172A] bg-white p-6 shadow-[-4px_0px_0px_0px_#0F172A] space-y-6 overflow-y-auto"
         >
-          <SheetHeader className="border-b border-[#E5DFD5] pb-4 space-y-1 text-left">
-            <div className="flex items-center justify-between">
+          <SheetHeader className="border-b border-[#E5DFD5] pb-4 pr-14 space-y-1.5 text-left">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Invoice Details
               </span>
               {sheetInvoice && <StatusBadge status={sheetInvoice.status} />}
             </div>
-            <SheetTitle className="font-display text-2xl font-bold text-[#0F172A]">
+            <SheetTitle className="font-display text-2xl font-bold text-[#0F172A] break-words">
               {sheetInvoice ? formatPeso(sheetInvoice.amount) : ""}
             </SheetTitle>
             <SheetDescription className="text-xs text-slate-600">
@@ -1065,15 +1072,12 @@ export function ClientTimesheetsView({ initialData }: ClientTimesheetsViewProps)
                 </div>
               </div>
 
-              {/* Task Breakdown notice */}
-              <div className="rounded-xl border border-[#E5DFD5] bg-[#FAF7F2] p-3.5 space-y-1.5 text-slate-600">
-                <span className="font-bold text-[#0F172A] block text-xs">
-                  Billing Breakdown
-                </span>
-                <p className="text-[11px] leading-relaxed">
-                  This invoice bundles all approved work sessions logged by {studentFirstName} up to the issued date. Individual sessions and task breakdowns are recorded in the Approved tab.
-                </p>
-              </div>
+              {/* Itemized Work Table */}
+              <InvoiceLineItemsTable
+                lineItems={sheetInvoice.lineItems}
+                totalHours={sheetInvoice.totalHours}
+                totalAmount={sheetInvoice.amount}
+              />
             </div>
           )}
         </SheetContent>

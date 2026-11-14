@@ -3,7 +3,7 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import { ClientTimesheetsView } from "./client-timesheets-view";
 import { DisputeDialog } from "./dispute-dialog";
-import { ClientTimesheetData } from "@/lib/services/invoice-service";
+import { ClientTimesheetData, FormattedInvoice } from "@/lib/services/invoice-service";
 import { InvoiceStatus, TimeLogStatus, CorrectionStatus } from "@prisma/client";
 
 vi.mock("next/navigation", () => ({
@@ -246,6 +246,97 @@ describe("ClientTimesheetsView Redesign", () => {
       expect(html).toContain('data-testid="dispute-submit"');
       expect(html).toContain("Send dispute");
       expect(html).toContain("Juan will be notified with your reason.");
+    });
+  });
+
+  describe("InvoiceDetailSheet Component", () => {
+    it("renders itemized work table with line items, formatted Asia/Manila session time, and total row", () => {
+      const invoiceWithLines: FormattedInvoice = {
+        id: "inv-detailed",
+        studentId: "student-1",
+        clientId: "client-1",
+        studentName: "Juan Dela Cruz",
+        clientName: "Maria Santos",
+        totalHours: 2.5,
+        rate: 150,
+        amount: 375,
+        status: InvoiceStatus.APPROVED,
+        createdAt: new Date("2026-11-12T10:00:00.000Z"),
+        updatedAt: new Date("2026-11-12T10:00:00.000Z"),
+        lineItems: [
+          {
+            id: "tl-1",
+            timeIn: new Date("2026-11-12T01:00:00.000Z"), // 9:00 AM Manila
+            timeOut: new Date("2026-11-12T02:00:00.000Z"), // 10:00 AM Manila
+            totalHours: 1.0,
+            taskTitle: "Design landing page wireframes",
+            sessionNote: "Completed wireframes",
+            amount: 150,
+          },
+          {
+            id: "tl-2",
+            timeIn: new Date("2026-11-12T05:00:00.000Z"), // 1:00 PM Manila
+            timeOut: new Date("2026-11-12T06:30:00.000Z"), // 2:30 PM Manila
+            totalHours: 1.5,
+            taskTitle: "Competitor analysis spreadsheet",
+            sessionNote: null,
+            amount: 225,
+          },
+        ],
+      };
+
+      const html = renderClean(
+        <ClientTimesheetsView initialData={mockData} initialSheetInvoice={invoiceWithLines} />
+      );
+
+      expect(html).toContain('data-testid="invoice-sheet"');
+      expect(html).toContain("pr-14");
+      expect(html).toContain("Itemized Work");
+      expect(html).toContain("Date");
+      expect(html).toContain("Task");
+      expect(html).toContain("Session");
+      expect(html).toContain("Hours");
+      expect(html).toContain("Amount");
+      expect(html).toContain('data-testid="invoice-detail-row"');
+      expect(html).toContain("Design landing page wireframes");
+      expect(html).toContain("Completed wireframes");
+      expect(html).toContain("Competitor analysis spreadsheet");
+      expect(html).toContain("9:00 AM – 10:00 AM");
+      expect(html).toContain("1:00 PM – 2:30 PM");
+      expect(html).toContain("1h");
+      expect(html).toContain("1h 30m");
+      expect(html).toContain("₱150.00");
+      expect(html).toContain("₱225.00");
+      expect(html).toContain('data-testid="invoice-detail-total"');
+      expect(html).toContain("2h 30m");
+      expect(html).toContain("₱375.00");
+    });
+
+    it("falls back gracefully when an invoice has no line items", () => {
+      const invoiceNoLines: FormattedInvoice = {
+        id: "inv-legacy",
+        studentId: "student-1",
+        clientId: "client-1",
+        studentName: "Juan Dela Cruz",
+        clientName: "Maria Santos",
+        totalHours: 2.0,
+        rate: 150,
+        amount: 300,
+        status: InvoiceStatus.APPROVED,
+        createdAt: new Date("2026-11-10T10:00:00.000Z"),
+        updatedAt: new Date("2026-11-10T10:00:00.000Z"),
+        lineItems: [],
+      };
+
+      const html = renderClean(
+        <ClientTimesheetsView initialData={mockData} initialSheetInvoice={invoiceNoLines} />
+      );
+
+      expect(html).toContain('data-testid="invoice-sheet"');
+      expect(html).toContain("Line items not available");
+      expect(html).toContain("Individual session details are not available for this invoice.");
+      expect(html).toContain("2h");
+      expect(html).toContain("₱300.00");
     });
   });
 });

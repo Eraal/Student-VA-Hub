@@ -32,6 +32,7 @@ describe("AppNav / StudentNav / ClientNav shell redesign", () => {
     expect(html).toContain('data-testid="nav-tasks"');
     expect(html).toContain('data-testid="nav-time"');
     expect(html).toContain('data-testid="nav-earnings"');
+    expect(html).toContain('data-testid="nav-reports"');
     expect(html).toContain('data-testid="nav-collapse-toggle"');
   });
 
@@ -45,6 +46,7 @@ describe("AppNav / StudentNav / ClientNav shell redesign", () => {
     expect(html).toContain('data-testid="nav-calendar"');
     expect(html).toContain('data-testid="nav-tasks"');
     expect(html).toContain('data-testid="nav-timesheets"');
+    expect(html).toContain('data-testid="nav-reports"');
     expect(html).toContain('data-testid="nav-collapse-toggle"');
   });
 
